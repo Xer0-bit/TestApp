@@ -3,12 +3,15 @@ package com.example.testapp;
 import android.content.Context;
 import android.opengl.GLSurfaceView;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.os.SystemClock;
 
 public class GameSurfaceView extends GLSurfaceView {
 
     private final GameRenderer renderer;
+    private long lastTouchTime = 0;
 
     public GameSurfaceView(Context context) {
         this(context, null);
@@ -19,6 +22,8 @@ public class GameSurfaceView extends GLSurfaceView {
         setEGLContextClientVersion(2);
         renderer = new GameRenderer(context);
         setRenderer(renderer);
+        // Prevent expensive UI event throttling on some devices
+        setPreserveEGLContextOnPause(true);
         setRenderMode(RENDERMODE_CONTINUOUSLY);
         setFocusable(true);
         setFocusableInTouchMode(true);
@@ -65,28 +70,44 @@ public class GameSurfaceView extends GLSurfaceView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         try {
-            if (event.getAction() != MotionEvent.ACTION_DOWN) {
-                return true;
-            }
+            long now = SystemClock.uptimeMillis();
+
+            Log.d("DBG_TOUCH",
+                    "ACTION=" + event.getActionMasked() +
+                            "  time=" + now +
+                            "  thread=" + Thread.currentThread().getName()
+            );
 
             GameLogic logic = renderer.getLogic();
             if (logic == null) return true;
+            if (!logic.isPlaying()) return true;
 
-            // Only process touch during PLAYING state
-            if (!logic.isPlaying()) {
+            if (event.getActionMasked() != MotionEvent.ACTION_DOWN) {
                 return true;
             }
 
-            float x = event.getX();
-            float w = getWidth();
+            final float x = event.getX();
+            final float w = getWidth();
 
-            // Left side of screen = jump RIGHT, Right side = jump LEFT (flipped for user perspective)
-            if (x < w / 2f) {
-                logic.jumpRight();
-            } else {
-                logic.jumpLeft();
-            }
+            // Capture timestamp for GL-thread delta
+            final long inputTimestamp = now;
+
+            queueEvent(() -> {
+                Log.d("DBG_INPUT_GL",
+                        "GL thread got input at " + SystemClock.uptimeMillis() +
+                                "  delta=" + (SystemClock.uptimeMillis() - inputTimestamp) +
+                                "ms  thread=" + Thread.currentThread().getName()
+                );
+
+                if (x < w / 2f) {
+                    logic.jumpRight();
+                } else {
+                    logic.jumpLeft();
+                }
+            });
+
             return true;
+
         } catch (Exception e) {
             e.printStackTrace();
             return true;

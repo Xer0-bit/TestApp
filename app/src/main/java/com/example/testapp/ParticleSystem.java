@@ -2,6 +2,9 @@ package com.example.testapp;
 
 import android.opengl.GLES20;
 import android.opengl.Matrix;
+import android.os.SystemClock;
+import android.util.Log;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -21,6 +24,8 @@ public class ParticleSystem {
     // Colors
     private static final float[] BREAK_COLOR = {0.4f, 0.8f, 1f, 0.8f}; // Blue glass
     private static final float[] LAND_COLOR = {1f, 0.8f, 0.1f, 0.7f}; // Gold
+    private final Object particleLock = new Object();
+
 
     private static class Particle {
         float x, y, z;
@@ -123,24 +128,33 @@ public class ParticleSystem {
     }
 
     public void spawnBreakEffect(float x, float y, float z) {
-        for (int i = 0; i < BREAK_PARTICLE_COUNT; i++) {
-            float angle = random.nextFloat() * (float) Math.PI * 2;
-            float speed = random.nextFloat() * 0.15f + 0.05f;
-            float vx = (float) Math.cos(angle) * speed;
-            float vz = (float) Math.sin(angle) * speed;
-            float vy = random.nextFloat() * 0.1f + 0.05f;
-            particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, BREAK_COLOR, 0.08f));
+        Log.d("DBG_PARTICLES",
+                "spawnBreakEffect at " + SystemClock.uptimeMillis() +
+                        "  thread=" + Thread.currentThread().getName() +
+                        "  sizeBefore=" + particles.size()
+        );
+        synchronized (particleLock) {
+            for (int i = 0; i < BREAK_PARTICLE_COUNT; i++) {
+                float angle = random.nextFloat() * (float) Math.PI * 2;
+                float speed = random.nextFloat() * 0.15f + 0.05f;
+                float vx = (float) Math.cos(angle) * speed;
+                float vz = (float) Math.sin(angle) * speed;
+                float vy = random.nextFloat() * 0.1f + 0.05f;
+                particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, BREAK_COLOR, 0.08f));
+            }
         }
     }
 
     public void spawnLandEffect(float x, float y, float z) {
-        for (int i = 0; i < LAND_PARTICLE_COUNT; i++) {
-            float angle = random.nextFloat() * (float) Math.PI * 2;
-            float speed = random.nextFloat() * 0.1f + 0.03f;
-            float vx = (float) Math.cos(angle) * speed;
-            float vz = (float) Math.sin(angle) * speed;
-            float vy = random.nextFloat() * 0.05f + 0.02f;
-            particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, LAND_COLOR, 0.06f));
+        synchronized (particleLock) {
+            for (int i = 0; i < LAND_PARTICLE_COUNT; i++) {
+                float angle = random.nextFloat() * (float) Math.PI * 2;
+                float speed = random.nextFloat() * 0.1f + 0.03f;
+                float vx = (float) Math.cos(angle) * speed;
+                float vz = (float) Math.sin(angle) * speed;
+                float vy = random.nextFloat() * 0.05f + 0.02f;
+                particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, LAND_COLOR, 0.06f));
+            }
         }
     }
 
@@ -149,38 +163,44 @@ public class ParticleSystem {
     }
 
     public void update() {
-        for (int i = particles.size() - 1; i >= 0; i--) {
-            Particle p = particles.get(i);
-            p.update();
-            if (!p.isAlive()) {
-                particles.remove(i);
+        synchronized (particleLock) {
+            for (int i = particles.size() - 1; i >= 0; i--) {
+                Particle p = particles.get(i);
+                p.update();
+                if (!p.isAlive()) {
+                    particles.remove(i);
+                }
             }
         }
     }
 
     public void draw(float[] vpMatrix) {
-        if (particles.isEmpty() || ShaderHelper.program == -1) return;
+        if (ShaderHelper.program == -1) return;
 
-        GLES20.glUseProgram(ShaderHelper.program);
+        synchronized (particleLock) {
+            if (particles.isEmpty()) return;
 
-        for (Particle p : particles) {
-            Matrix.setIdentityM(modelMatrix, 0);
-            Matrix.translateM(modelMatrix, 0, p.x, p.y, p.z);
-            Matrix.scaleM(modelMatrix, 0, p.size, p.size, p.size);
-            Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+            GLES20.glUseProgram(ShaderHelper.program);
 
-            float[] color = p.color.clone();
-            color[3] *= p.getAlpha(); // Fade out over time
+            for (Particle p : particles) {
+                Matrix.setIdentityM(modelMatrix, 0);
+                Matrix.translateM(modelMatrix, 0, p.x, p.y, p.z);
+                Matrix.scaleM(modelMatrix, 0, p.size, p.size, p.size);
+                Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
 
-            GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
-            GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
+                float[] color = p.color.clone();
+                color[3] *= p.getAlpha();
 
-            particleBuffer.position(0);
-            GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
-            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
-                    GLES20.GL_FLOAT, false, 0, particleBuffer);
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, CUBE_VERTICES.length / COORDS_PER_VERTEX);
-            GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
+                GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+                GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
+
+                particleBuffer.position(0);
+                GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+                GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
+                        GLES20.GL_FLOAT, false, 0, particleBuffer);
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, CUBE_VERTICES.length / COORDS_PER_VERTEX);
+                GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
+            }
         }
     }
 }

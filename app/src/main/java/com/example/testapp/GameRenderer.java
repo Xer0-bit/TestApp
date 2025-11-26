@@ -4,6 +4,8 @@ import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
+import android.os.SystemClock;
+import android.util.Log;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -27,6 +29,9 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     private static final float CAMERA_DISTANCE = 8f;
     private static final float LOOK_AHEAD_DISTANCE = 5f;
     private static final float SHAKE_DAMPING = 0.5f;
+    private long lastFrameTimeDbg = 0;
+    private long lastTouchDbg = 0; // we'll fill this from GameSurfaceView
+
 
     public GameRenderer(Context ctx) {
         context = ctx;
@@ -55,6 +60,20 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
+        long now = SystemClock.uptimeMillis();
+
+        // Debug frame timing
+        if (lastFrameTimeDbg != 0) {
+            long delta = now - lastFrameTimeDbg;
+
+            if (delta > 20) {
+                Log.w("DBG_FRAME",
+                        "Slow frame: " + delta + "ms" +
+                                "  thread=" + Thread.currentThread().getName()
+                );
+            }
+        }
+        lastFrameTimeDbg = now;
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
         // Update game logic

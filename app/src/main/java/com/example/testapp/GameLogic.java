@@ -12,73 +12,35 @@ public class GameLogic {
     private int currentJump = 0;
     private Random random = new Random();
 
-    private long startTimeMs;
-    private long pausedTimeStartMs = 0;
-    private long pausedAccumMs = 0;
-    private boolean running = false;
-
-    private long bestTime = Long.MAX_VALUE;
-
-    // respawn delay state (when wrong jump)
-    private boolean waitingToRespawn = false;
-    private long respawnStartMs = 0;
-    private long respawnDelayMs = 900; // short delay so fall animation shows
+    private long startTime;
+    public long bestTime = Long.MAX_VALUE;
 
     public GameLogic() {
-        resetGameState();
+        resetGame();
     }
 
-    public void resetGameState() {
+    public void resetGame() {
         platforms = new PlatformGlass[TOTAL_JUMPS];
         for (int i = 0; i < TOTAL_JUMPS; i++) {
             boolean correctIsLeft = random.nextBoolean();
             platforms[i] = new PlatformGlass(i, correctIsLeft);
         }
+
         player = new Player();
         currentJump = 0;
-        running = false;
-        pausedAccumMs = 0;
-        waitingToRespawn = false;
+
+        startTime = System.currentTimeMillis();
     }
 
-    public void start() {
-        resetGameState();
-        running = true;
-        startTimeMs = System.currentTimeMillis();
+    public void jumpLeft() {
+        handleJump(true);
     }
 
-    public boolean isRunning() {
-        return running && !waitingToRespawn;
+    public void jumpRight() {
+        handleJump(false);
     }
-
-    public void pause() {
-        if (!running) return;
-        pausedTimeStartMs = System.currentTimeMillis();
-        running = false;
-    }
-
-    public void resume() {
-        if (pausedTimeStartMs == 0) {
-            running = true;
-            return;
-        }
-        long now = System.currentTimeMillis();
-        pausedAccumMs += (now - pausedTimeStartMs);
-        pausedTimeStartMs = 0;
-        running = true;
-    }
-
-    public void restart() {
-        resetGameState();
-        start();
-    }
-
-    public void jumpLeft() { handleJump(true); }
-    public void jumpRight() { handleJump(false); }
 
     private void handleJump(boolean left) {
-        if (!running) return;
-        if (waitingToRespawn) return;
         if (currentJump >= TOTAL_JUMPS) return;
 
         PlatformGlass p = platforms[currentJump];
@@ -86,65 +48,26 @@ public class GameLogic {
         if (p.isCorrect(left)) {
             player.jumpTo(p.getX(left), p.getY());
             currentJump++;
+
             if (currentJump == TOTAL_JUMPS) {
-                // finished run
-                long finishMs = System.currentTimeMillis() - startTimeMs - pausedAccumMs;
-                if (finishMs < bestTime) bestTime = finishMs;
-                running = false;
+                long finish = System.currentTimeMillis() - startTime;
+                if (finish < bestTime) bestTime = finish;
             }
+
         } else {
-            // wrong: break platform and start fall/respawn timer
-            p.breakPlatform();
             player.fall();
-            waitingToRespawn = true;
-            respawnStartMs = System.currentTimeMillis();
+            p.breakSide(left); // Only break the incorrect side
         }
     }
 
     public void update() {
-        // update pieces and player
-        long now = System.currentTimeMillis();
-
-        // update platform pieces if broken
-        for (PlatformGlass p : platforms) {
-            if (p != null) p.update();
-        }
-
         player.update();
-
-        // check respawn timer
-        if (waitingToRespawn) {
-            if (now - respawnStartMs >= respawnDelayMs) {
-                // respawn player at start but keep broken platforms broken
-                player = new Player(); // fresh player at start
-                currentJump = 0;
-                waitingToRespawn = false;
-                // do not restart timer; run continues
-            }
-        }
     }
 
     public void draw(float[] vpMatrix) {
-        // draw platforms then player
-        for (PlatformGlass p : platforms) {
-            if (p != null) p.draw(vpMatrix);
-        }
-        if (player != null) player.draw(vpMatrix);
-    }
+        for (PlatformGlass p : platforms)
+            p.draw(vpMatrix);
 
-    // timer accessors used by UI
-    public double getElapsedSeconds() {
-        if (startTimeMs == 0) return 0.0;
-        long now = System.currentTimeMillis();
-        long elapsed = now - startTimeMs - pausedAccumMs;
-        if (!running && waitingToRespawn) {
-            // still count elapsed during respawn (optional): keep counting
-        }
-        if (elapsed < 0) elapsed = 0;
-        return elapsed / 1000.0;
-    }
-
-    public long getBestTimeMs() {
-        return bestTime;
+        player.draw(vpMatrix);
     }
 }

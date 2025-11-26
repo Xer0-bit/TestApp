@@ -13,10 +13,9 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     public GameLogic logic;
     private Context context;
 
-    // combined projection * view matrix
-    private final float[] vpMatrix = new float[16];
-    private final float[] projectionMatrix = new float[16];
-    private final float[] viewMatrix = new float[16];
+    public static float[] projectionMatrix = new float[16];
+    public static float[] viewMatrix = new float[16];
+    public static float[] vpMatrix = new float[16];
 
     public GameRenderer(Context ctx) {
         context = ctx;
@@ -25,52 +24,37 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
-        // background black
+        // soft sky background
         GLES20.glClearColor(0.6f, 0.7f, 0.9f, 1f);
+
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
-
-        // enable blending for glass transparency
-        GLES20.glEnable(GLES20.GL_BLEND);
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
-
-        // init shader program
-        ShaderHelper.init();
-    }
-
-    @Override
-    public void onDrawFrame(GL10 gl) {
-        // clear
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-
-        // update game logic
-        logic.update();
-
-        // draw using the cached vpMatrix
-        logic.draw(vpMatrix);
+        GLES20.glDepthFunc(GLES20.GL_LEQUAL);
     }
 
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         GLES20.glViewport(0, 0, width, height);
 
-        float ratio = (float) width / height;
+        float aspect = (float) width / height;
 
-        // projection: perspective frustum
-        final float left = -ratio;
-        final float right = ratio;
-        final float bottom = -1f;
-        final float top = 1f;
-        final float near = 1f;
-        final float far = 50f;
-        Matrix.frustumM(projectionMatrix, 0, left, right, bottom, top, near, far);
+        // Perspective camera
+        Matrix.perspectiveM(projectionMatrix, 0, 45f, aspect, 0.1f, 150f);
 
-        // view: camera positioned slightly behind and above, looking toward origin
+        // Camera looking forward at platforms
         Matrix.setLookAtM(viewMatrix, 0,
-                0f, -3.0f, 6f,   // eyeX, eyeY, eyeZ
-                0f, 0f, 0f,   // centerX, centerY, centerZ
-                0f, 1f, 0f);  // upX, upY, upZ
+                0f, 1.2f, 4f,       // eye
+                0f, 1.2f, -20f,     // look at
+                0f, 1f, 0f);        // up
+    }
 
-        // vp = projection * view
+    @Override
+    public void onDrawFrame(GL10 gl) {
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
+
+        // Build view-projection matrix
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
+
+        logic.update();
+        logic.draw(vpMatrix);
     }
 }

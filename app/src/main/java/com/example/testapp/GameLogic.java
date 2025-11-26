@@ -13,6 +13,9 @@ public class GameLogic {
     private Random random = new Random();
 
     private long startTime;
+    private long pausedTime;
+    private boolean running = false;
+
     public long bestTime = Long.MAX_VALUE;
 
     public GameLogic() {
@@ -30,6 +33,7 @@ public class GameLogic {
         currentJump = 0;
 
         startTime = System.currentTimeMillis();
+        running = false;
     }
 
     public void jumpLeft() {
@@ -41,6 +45,7 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
+        if (!running) return; // ignore input if not running
         if (currentJump >= TOTAL_JUMPS) return;
 
         PlatformGlass p = platforms[currentJump];
@@ -52,6 +57,7 @@ public class GameLogic {
             if (currentJump == TOTAL_JUMPS) {
                 long finish = System.currentTimeMillis() - startTime;
                 if (finish < bestTime) bestTime = finish;
+                running = false;
             }
 
         } else {
@@ -69,5 +75,46 @@ public class GameLogic {
             p.draw(vpMatrix);
 
         player.draw(vpMatrix);
+    }
+
+    // --- New methods for MainActivity --- //
+
+    public void start() {
+        resetGame();
+        running = true;
+        startTime = System.currentTimeMillis();
+    }
+
+    public void pause() {
+        if (running) {
+            pausedTime = System.currentTimeMillis();
+            running = false;
+        }
+    }
+
+    public void resume() {
+        if (!running) {
+            long now = System.currentTimeMillis();
+            startTime += (now - pausedTime);
+            running = true;
+        }
+    }
+
+    public void restart() {
+        resetGame();
+        running = true;
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
+    public double getElapsedSeconds() {
+        if (running) return (System.currentTimeMillis() - startTime) / 1000.0;
+        else return (pausedTime - startTime) / 1000.0;
+    }
+
+    public long getBestTimeMs() {
+        return bestTime;
     }
 }

@@ -27,18 +27,14 @@ public class MainActivity extends AppCompatActivity {
         tvTimer = findViewById(R.id.tvTimer);
         tvBest = findViewById(R.id.tvBest);
 
-        btnStart.setOnClickListener(v -> {
-            gameView.getRenderer().logic.start();
-        });
+        btnStart.setOnClickListener(v -> gameView.getRenderer().getLogic().start());
 
         btnPause.setOnClickListener(v -> {
-            if (gameView.getRenderer().logic.isRunning()) gameView.getRenderer().logic.pause();
-            else gameView.getRenderer().logic.resume();
+            if (gameView.getRenderer().getLogic().isRunning()) gameView.getRenderer().getLogic().pause();
+            else gameView.getRenderer().getLogic().resume();
         });
 
-        btnRestart.setOnClickListener(v -> {
-            gameView.getRenderer().logic.restart();
-        });
+        btnRestart.setOnClickListener(v -> gameView.getRenderer().getLogic().restart());
 
         tickRunnable = new Runnable() {
             @Override
@@ -51,15 +47,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateTimerUI() {
-        GameLogic logic = gameView.getRenderer().logic;
+        GameLogic logic = gameView.getRenderer().getLogic();
         if (logic == null) return;
 
         double elapsed = logic.getElapsedSeconds();
-        if (logic.isRunning()) {
-            tvTimer.setText(String.format("Time: %.3fs", elapsed));
-        } else {
-            tvTimer.setText(String.format("Time: %.3fs", elapsed));
-        }
+        tvTimer.setText(String.format("Time: %.3fs", elapsed));
 
         long bestMs = logic.getBestTimeMs();
         if (bestMs == Long.MAX_VALUE) tvBest.setText("Best: --");
@@ -70,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         gameView.onPause();
-        gameView.getRenderer().logic.pause();
+        gameView.getRenderer().getLogic().pause();
     }
 
     @Override

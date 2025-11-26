@@ -33,11 +33,11 @@ public class GameSurfaceView extends GLSurfaceView {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            renderer.logic.jumpLeft();
+            renderer.getLogic().jumpLeft();
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            renderer.logic.jumpRight();
+            renderer.getLogic().jumpRight();
             return true;
         }
         return super.onKeyDown(keyCode, event);
@@ -48,8 +48,8 @@ public class GameSurfaceView extends GLSurfaceView {
         if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
         float x = event.getX();
         float w = getWidth();
-        if (x < w / 2f) renderer.logic.jumpLeft();
-        else renderer.logic.jumpRight();
+        if (x < w / 2f) renderer.getLogic().jumpLeft();
+        else renderer.getLogic().jumpRight();
         return true;
     }
 }

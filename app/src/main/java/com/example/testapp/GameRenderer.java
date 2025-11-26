@@ -22,9 +22,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         logic = new GameLogic();
     }
 
-    public GameLogic getLogic() {
-        return logic;
-    }
+    public GameLogic getLogic() { return logic; }
 
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
@@ -46,23 +44,19 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 gl) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        // Update logic first
+        // Update game logic
         logic.update();
 
-        // Camera: center between next two platforms
-        PlatformGlass[] platforms = logic.platforms;
-        int next = Math.min(logic.getNextPlatformIndex(), logic.platforms.length - 1);
-        PlatformGlass p1 = platforms[next];
-        PlatformGlass p2 = platforms[Math.min(next + 1, platforms.length - 1)];
+        // Camera follows player
+        Player player = logic.player;
 
-        float camX = (p1.getX(true) + p2.getX(true)) / 2f;
-        float camY = p1.getY() + 3f;
-        float camZ = (p1.getZ() + p2.getZ()) / 2f + 6f;
+        float camX = player.x;
+        float camY = player.y + 3f;   // above player
+        float camZ = player.z + 6f;   // behind player
 
-        // Look at midpoint
-        float lookX = (p1.getX(true) + p2.getX(true)) / 2f;
-        float lookY = p1.getY();
-        float lookZ = (p1.getZ() + p2.getZ()) / 2f;
+        float lookX = player.x;
+        float lookY = player.y;
+        float lookZ = player.z;
 
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,

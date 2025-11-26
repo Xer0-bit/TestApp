@@ -10,25 +10,19 @@ public class GameSurfaceView extends GLSurfaceView {
 
     private final GameRenderer renderer;
 
-    public GameSurfaceView(Context context) {
-        this(context, null);
-    }
+    public GameSurfaceView(Context context) { this(context, null); }
 
     public GameSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
         setEGLContextClientVersion(2);
-
         renderer = new GameRenderer(context);
         setRenderer(renderer);
         setRenderMode(RENDERMODE_CONTINUOUSLY);
-
         setFocusable(true);
         setFocusableInTouchMode(true);
     }
 
-    public GameRenderer getRenderer() {
-        return renderer;
-    }
+    public GameRenderer getRenderer() { return renderer; }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
@@ -38,18 +32,15 @@ public class GameSurfaceView extends GLSurfaceView {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_A:
-                logic.jumpLeft();
-                return true;
+                logic.jumpLeft(); return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_D:
-                logic.jumpRight();
-                return true;
+                logic.jumpRight(); return true;
             case KeyEvent.KEYCODE_ESCAPE:
                 if (logic.isRunning()) logic.pause();
                 else logic.resume();
                 return true;
-            default:
-                return super.onKeyDown(keyCode, event);
+            default: return super.onKeyDown(keyCode, event);
         }
     }
 

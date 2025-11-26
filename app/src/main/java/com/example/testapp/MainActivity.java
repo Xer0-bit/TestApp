@@ -19,7 +19,6 @@ public class MainActivity extends AppCompatActivity {
 
     private LinearLayout mainMenu, pauseMenu;
     private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu;
-
     private GameLogic logic;
 
     @Override
@@ -40,13 +39,11 @@ public class MainActivity extends AppCompatActivity {
 
         logic = gameView.getRenderer().getLogic();
 
-        // --- Main menu start ---
         btnStartGame.setOnClickListener(v -> {
             logic.start();
             mainMenu.setVisibility(View.GONE);
         });
 
-        // --- Pause menu buttons ---
         btnResume.setOnClickListener(v -> {
             logic.resume();
             pauseMenu.setVisibility(View.GONE);
@@ -63,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
             mainMenu.setVisibility(View.VISIBLE);
         });
 
-        // --- Timer updater ---
         tickRunnable = new Runnable() {
             @Override
             public void run() {
@@ -76,7 +72,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateTimerUI() {
         if (logic == null) return;
-
         double elapsed = logic.getElapsedSeconds();
         tvTimer.setText(String.format("Time Survived: %.2fs", elapsed));
     }
@@ -85,7 +80,6 @@ public class MainActivity extends AppCompatActivity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (logic == null) return super.onKeyDown(keyCode, event);
 
-        // Escape toggles pause menu
         if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (logic.isRunning()) {
                 logic.pause();
@@ -97,18 +91,13 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
 
-        // Only allow jump keys when game is running
         if (!logic.isRunning()) return true;
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
-            case KeyEvent.KEYCODE_A:
-                logic.jumpLeft();
-                return true;
+            case KeyEvent.KEYCODE_A: logic.jumpLeft(); return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-            case KeyEvent.KEYCODE_D:
-                logic.jumpRight();
-                return true;
+            case KeyEvent.KEYCODE_D: logic.jumpRight(); return true;
         }
 
         return super.onKeyDown(keyCode, event);

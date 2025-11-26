@@ -4,7 +4,7 @@ public class Player {
 
     public float x, y, z;
 
-    private float jumpSpeed = 0.2f;
+    private float jumpSpeed = 0.15f;  // movement interpolation
     private float targetX, targetY, targetZ;
     private boolean jumping = false;
     private boolean falling = false;
@@ -35,17 +35,20 @@ public class Player {
     }
 
     public void respawn() {
-        // Respawn back at player level without ending game
+        // back to last safe platform
         jumping = false;
         falling = false;
-        y = targetY; // reset to platform Y
+        x = targetX;
+        y = targetY;
+        z = targetZ - 0.5f; // slightly behind
     }
 
     public void update() {
         if (jumping) {
             float dx = targetX - x;
-            float dz = targetZ - z;
             float dy = targetY - y;
+            float dz = targetZ - z;
+
             if (Math.abs(dx) < 0.01f && Math.abs(dy) < 0.01f && Math.abs(dz) < 0.01f) {
                 x = targetX;
                 y = targetY;
@@ -60,9 +63,7 @@ public class Player {
 
         if (falling) {
             y -= 0.3f;
-            if (y < -2f) {
-                respawn();
-            }
+            if (y < -2f) respawn();
         }
     }
 

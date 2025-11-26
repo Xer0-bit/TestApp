@@ -50,6 +50,13 @@ public class ShaderHelper {
         uColorHandle = GLES20.glGetUniformLocation(program, "uColor");
     }
 
+    public static void release() {
+        if (program != 0) {
+            GLES20.glDeleteProgram(program);
+            program = 0;
+        }
+    }
+
     private static int loadShader(int type, String shaderCode) {
         int shader = GLES20.glCreateShader(type);
         GLES20.glShaderSource(shader, shaderCode);

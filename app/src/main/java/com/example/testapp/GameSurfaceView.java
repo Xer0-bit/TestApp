@@ -32,15 +32,25 @@ public class GameSurfaceView extends GLSurfaceView {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
-            renderer.getLogic().jumpLeft();
-            return true;
+        GameLogic logic = renderer.getLogic();
+        if (!logic.isRunning() && keyCode != KeyEvent.KEYCODE_ESCAPE) return true;
+
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_A:
+                logic.jumpLeft();
+                return true;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_D:
+                logic.jumpRight();
+                return true;
+            case KeyEvent.KEYCODE_ESCAPE:
+                if (logic.isRunning()) logic.pause();
+                else logic.resume();
+                return true;
+            default:
+                return super.onKeyDown(keyCode, event);
         }
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            renderer.getLogic().jumpRight();
-            return true;
-        }
-        return super.onKeyDown(keyCode, event);
     }
 
     @Override

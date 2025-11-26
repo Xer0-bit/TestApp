@@ -129,4 +129,10 @@ public class GameLogic {
     public void restart() {
         resetGame();
     }
+
+    // Add this getter at the bottom of GameLogic.java
+    public int getNextPlatformIndex() {
+        return nextPlatform;
+    }
+
 }

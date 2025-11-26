@@ -46,25 +46,31 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 gl) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        // update camera to follow player in third person
-        Player player = logic.player;
+        // Update logic first
+        logic.update();
 
-        float camDistance = 6f;       // behind player
-        float camHeight = 3f;         // above player
-        float camX = player.x;
-        float camY = player.y + camHeight;
-        float camZ = player.z + camDistance;
+        // Camera: center between next two platforms
+        PlatformGlass[] platforms = logic.platforms;
+        int next = Math.min(logic.getNextPlatformIndex(), logic.platforms.length - 1);
+        PlatformGlass p1 = platforms[next];
+        PlatformGlass p2 = platforms[Math.min(next + 1, platforms.length - 1)];
 
-        // Look at player position
+        float camX = (p1.getX(true) + p2.getX(true)) / 2f;
+        float camY = p1.getY() + 3f;
+        float camZ = (p1.getZ() + p2.getZ()) / 2f + 6f;
+
+        // Look at midpoint
+        float lookX = (p1.getX(true) + p2.getX(true)) / 2f;
+        float lookY = p1.getY();
+        float lookZ = (p1.getZ() + p2.getZ()) / 2f;
+
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,
-                player.x, player.y, player.z,
+                lookX, lookY, lookZ,
                 0f, 1f, 0f);
 
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 
-        // update game logic & draw
-        logic.update();
         logic.draw(vpMatrix);
     }
 }

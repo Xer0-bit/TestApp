@@ -1,22 +1,24 @@
 package com.example.testapp;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
-import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 public class GameLogic {
 
+    // Constants
     private static final int TOTAL_PLATFORMS = 6;
     private static final float PLATFORM_Y = 1.0f;
     private static final float PLATFORM_Z_SPACING = 5f;
-    private static final long INPUT_DELAY_MS = 200;
+    private static final long INPUT_DELAY_MS = 150;
+    private static final float JUMP_LAND_SHAKE = 0.15f;
+    private static final float GLASS_BREAK_SHAKE = 0.25f;
     private static final float SHAKE_DECAY_RATE = 3.0f;
-    private static final long RESPAWN_DELAY_MS = 1000;
-    private static final long LAND_EFFECT_DELAY_MS = 300;
+    private static final long RESPAWN_DELAY_MS = 400;
+    private static final long LAND_EFFECT_DELAY_MS = 250;
     private static final float MAX_DELTA_TIME = 0.05f;
+    private boolean hasStartedTimer = false;
 
     public enum GameState {
         MENU, PLAYING, PAUSED, WON
@@ -24,11 +26,9 @@ public class GameLogic {
 
     public PlatformGlass[] platforms;
     public Player player;
-    public ParticleSystem particles;
 
     private int nextPlatform = 0;
     private Random random = new Random();
-    private Handler handler;
 
     private GameState state = GameState.MENU;
     private long gameStartTime = 0;
@@ -41,18 +41,21 @@ public class GameLogic {
     private long lastJumpTime = 0;
     private long lastFrameTime = 0;
     private boolean isRespawning = false;
-    private boolean hasStartedTimer = false;
     private volatile boolean isActive = true;
 
-    // Deferred effects - simple queue for land/break effects
-    private long landEffectTime = 0;
-    private float landEffectX, landEffectY, landEffectZ;
-    private long breakEffectTime = 0;
-    private long respawnTime = 0;
+    // Scheduled events system
+    private static class ScheduledEvent {
+        long executeAt;
+        Runnable action;
+        ScheduledEvent(long executeAt, Runnable action) {
+            this.executeAt = executeAt;
+            this.action = action;
+        }
+    }
+
+    private final ArrayList<ScheduledEvent> scheduledEvents = new ArrayList<>();
 
     public GameLogic() {
-        handler = new Handler(Looper.getMainLooper());
-        particles = new ParticleSystem();
         initializeGame();
     }
 
@@ -62,35 +65,34 @@ public class GameLogic {
         }
         float startZ = 0f;
 
-        for (int i = 0; i < TOTAL_PLATFORMS - 1; i++) {
+        // First platform - starting platform (black, centered, full width)
+        platforms[0] = new PlatformGlass(0, true, PLATFORM_Y, startZ);
+        platforms[0].setIsStart(true);
+
+        // Middle platforms - regular glass bridge sections
+        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
             boolean leftIsCorrect = random.nextBoolean();
             platforms[i] = new PlatformGlass(i, leftIsCorrect, PLATFORM_Y, startZ + i * PLATFORM_Z_SPACING);
         }
 
+        // Last platform - finish platform (black, centered, full width)
         platforms[TOTAL_PLATFORMS - 1] = new PlatformGlass(TOTAL_PLATFORMS - 1, true, PLATFORM_Y, startZ + (TOTAL_PLATFORMS - 1) * PLATFORM_Z_SPACING);
         platforms[TOTAL_PLATFORMS - 1].setIsFinish(true);
 
         if (player == null) {
-            player = new Player(0f, PLATFORM_Y, -2f);
+            player = new Player(0f, PLATFORM_Y, startZ);
         } else {
-            player.respawn();
+            player.respawnToStart(startZ);
         }
 
-        nextPlatform = 0;
+        nextPlatform = 1; // Start at platform 1 (first glass bridge platform)
         shakeAmount = 0f;
         lastJumpTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         isRespawning = false;
         hasStartedTimer = false;
-        landEffectTime = 0;
-        breakEffectTime = 0;
-        respawnTime = 0;
 
-        if (particles == null) {
-            particles = new ParticleSystem();
-        } else {
-            particles.clear();
-        }
+        scheduledEvents.clear();
     }
 
     public void startGame() {
@@ -110,6 +112,7 @@ public class GameLogic {
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+        hasStartedTimer = true;
     }
 
     public void pauseGame() {
@@ -131,6 +134,13 @@ public class GameLogic {
         initializeGame();
         totalPausedTime = 0;
         winTime = 0;
+    }
+
+    private void scheduleOnGLThread(Runnable action, long delayMs) {
+        long runAt = SystemClock.uptimeMillis() + Math.max(0, delayMs);
+        synchronized (scheduledEvents) {
+            scheduledEvents.add(new ScheduledEvent(runAt, action));
+        }
     }
 
     public void jumpLeft() {
@@ -156,7 +166,7 @@ public class GameLogic {
         }
         lastJumpTime = currentTime;
 
-        // Start timer when first jump happens
+        // Start timer on first jump
         if (!hasStartedTimer) {
             hasStartedTimer = true;
             gameStartTime = currentTime;
@@ -168,29 +178,28 @@ public class GameLogic {
             player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
             nextPlatform++;
 
-            // Schedule land effect to run in update() instead of on main thread
-            landEffectTime = currentTime + LAND_EFFECT_DELAY_MS;
-            landEffectX = player.x;
-            landEffectY = PLATFORM_Y;
-            landEffectZ = player.z;
+            shakeAmount = JUMP_LAND_SHAKE;
 
             if (nextPlatform >= TOTAL_PLATFORMS) {
-                winGame();
+                scheduleOnGLThread(this::winGame, 0);
             }
         } else {
             p.breakSide(left);
-
-            // Spawn break effect immediately (no threading)
-            if (particles != null) {
-                particles.spawnBreakEffect(p.getX(left), p.getY(), p.getZ());
-            }
-
-            shakeAmount = 0.25f;
+            shakeAmount = GLASS_BREAK_SHAKE;
 
             if (player != null) {
                 player.fall();
                 isRespawning = true;
-                respawnTime = currentTime + RESPAWN_DELAY_MS;
+
+                // Schedule respawn
+                scheduleOnGLThread(() -> {
+                    if (isActive && player != null && state == GameState.PLAYING) {
+                        player.respawn();
+                        nextPlatform = 1; // Reset to first glass platform
+                        isRespawning = false;
+                        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+                    }
+                }, RESPAWN_DELAY_MS);
             }
         }
     }
@@ -204,43 +213,30 @@ public class GameLogic {
         if (elapsed < bestTime) {
             bestTime = elapsed;
         }
-
-        if (particles != null) {
-            particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
-            particles.spawnLandEffect(player.x + 0.5f, PLATFORM_Y, player.z);
-            particles.spawnLandEffect(player.x - 0.5f, PLATFORM_Y, player.z);
-        }
     }
 
     public void update() {
         if (state != GameState.PLAYING || !isActive) return;
-
         if (player == null || platforms == null) return;
 
         long currentTime = SystemClock.uptimeMillis();
         float deltaTime = (currentTime - lastFrameTime) / 1000.0f;
         lastFrameTime = currentTime;
-
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
-        // Process deferred land effect
-        if (landEffectTime > 0 && currentTime >= landEffectTime) {
-            if (particles != null) {
-                particles.spawnLandEffect(landEffectX, landEffectY, landEffectZ);
+        // Execute scheduled events
+        synchronized (scheduledEvents) {
+            for (int i = scheduledEvents.size() - 1; i >= 0; i--) {
+                ScheduledEvent ev = scheduledEvents.get(i);
+                if (ev.executeAt <= currentTime) {
+                    try {
+                        ev.action.run();
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    }
+                    scheduledEvents.remove(i);
+                }
             }
-            shakeAmount = 0.15f;
-            landEffectTime = 0;
-        }
-
-        // Process deferred respawn
-        if (isRespawning && respawnTime > 0 && currentTime >= respawnTime) {
-            if (player != null && state == GameState.PLAYING) {
-                player.respawn();
-                nextPlatform = 0;
-                isRespawning = false;
-                lastJumpTime = currentTime - INPUT_DELAY_MS;
-            }
-            respawnTime = 0;
         }
 
         player.update();
@@ -251,17 +247,13 @@ public class GameLogic {
             }
         }
 
-        if (particles != null) {
-            particles.update();
-        }
-
         if (shakeAmount > 0) {
             shakeAmount = Math.max(0f, shakeAmount - SHAKE_DECAY_RATE * deltaTime);
         }
     }
 
     public void draw(float[] vpMatrix) {
-        if (vpMatrix == null || platforms == null || player == null || particles == null) {
+        if (vpMatrix == null || platforms == null || player == null) {
             return;
         }
 
@@ -271,7 +263,6 @@ public class GameLogic {
             }
         }
         player.draw(vpMatrix);
-        particles.draw(vpMatrix);
     }
 
     public float getShakeAmount() {
@@ -301,8 +292,8 @@ public class GameLogic {
 
     public void cleanup() {
         isActive = false;
-        if (handler != null) {
-            handler.removeCallbacksAndMessages(null);
+        synchronized (scheduledEvents) {
+            scheduledEvents.clear();
         }
     }
 }

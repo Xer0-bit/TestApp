@@ -4,7 +4,6 @@ import android.content.Context;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
-import android.os.SystemClock;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -44,7 +43,6 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         GLES20.glEnable(GLES20.GL_BLEND);
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
 
-        // Pre-compile shaders immediately to avoid stalls later
         ShaderHelper.init();
     }
 
@@ -65,7 +63,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         Player player = logic.player;
         if (player == null) return;
 
-        // Calculate shake ONCE per frame and cache it (skip if no shake)
+        // Calculate shake once per frame
         float shake = logic.getShakeAmount();
         if (shake > 0) {
             cachedShakeX = (shakeRandom.nextFloat() - 0.5f) * shake;
@@ -77,12 +75,12 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             cachedShakeZ = 0;
         }
 
-        // Camera positioned above and behind, looking down the platforms
+        // Camera positioned above and behind
         float camX = cachedShakeX;
         float camY = player.y + CAMERA_HEIGHT + cachedShakeY;
         float camZ = player.z - CAMERA_DISTANCE + cachedShakeZ;
 
-        // Look at point: centered between platforms, slightly ahead of player
+        // Look at point
         float lookX = cachedShakeX * SHAKE_DAMPING;
         float lookY = player.y + cachedShakeY * SHAKE_DAMPING;
         float lookZ = player.z + LOOK_AHEAD_DISTANCE + cachedShakeZ * SHAKE_DAMPING;
@@ -94,15 +92,8 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 
-        // Draw solids with depth write
+        // Draw solids
         logic.draw(vpMatrix);
-
-        // Draw particles without depth write to ensure visibility
-        GLES20.glDepthMask(false);
-        if (logic.particles != null) {
-            logic.particles.draw(vpMatrix);
-        }
-        GLES20.glDepthMask(true);
     }
 
     public void release() {

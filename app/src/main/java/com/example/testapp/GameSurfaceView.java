@@ -9,8 +9,6 @@ import android.view.MotionEvent;
 public class GameSurfaceView extends GLSurfaceView {
 
     private final GameRenderer renderer;
-    private long lastTouchInputTime = 0;
-    private static final long TOUCH_DEBOUNCE_MS = 200;
 
     public GameSurfaceView(Context context) {
         this(context, null);
@@ -35,8 +33,14 @@ public class GameSurfaceView extends GLSurfaceView {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         try {
             GameLogic logic = renderer.getLogic();
-            if (logic == null || !logic.isPlaying()) {
-                return keyCode == KeyEvent.KEYCODE_ESCAPE;
+            if (logic == null) return true;
+
+            if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                return true;
+            }
+
+            if (!logic.isPlaying()) {
+                return true;
             }
 
             switch (keyCode) {
@@ -47,8 +51,6 @@ public class GameSurfaceView extends GLSurfaceView {
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                 case KeyEvent.KEYCODE_D:
                     logic.jumpLeft();
-                    return true;
-                case KeyEvent.KEYCODE_ESCAPE:
                     return true;
                 default:
                     return super.onKeyDown(keyCode, event);
@@ -62,40 +64,35 @@ public class GameSurfaceView extends GLSurfaceView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         try {
-            if (event.getActionMasked() != MotionEvent.ACTION_DOWN) {
+            GameLogic logic = renderer.getLogic();
+            if (logic == null) return true;
+            if (!logic.isPlaying()) return true;
+
+            // Only process ACTION_DOWN to prevent lag from repeated events
+            int action = event.getActionMasked();
+            if (action != MotionEvent.ACTION_DOWN) {
                 return true;
             }
 
-            GameLogic logic = renderer.getLogic();
+            final float x = event.getX();
+            final float w = getWidth();
 
-            // ONLY process touch if game is actively playing
-            if (logic == null || !logic.isPlaying()) {
-                return false; // Don't consume - let UI handle it
-            }
-
-            // Debounce touch input on UI thread BEFORE queuing
-            long now = System.currentTimeMillis();
-            if (now - lastTouchInputTime < TOUCH_DEBOUNCE_MS) {
-                return true; // Ignore rapid taps
-            }
-            lastTouchInputTime = now;
-
-            float x = event.getX();
-            float w = getWidth();
-
-            // Queue the jump on GL thread
+            // Queue to GL thread to ensure thread safety with OpenGL state
             queueEvent(() -> {
-                if (x < w / 2f) {
-                    logic.jumpRight();
-                } else {
-                    logic.jumpLeft();
+                if (logic.isPlaying()) {
+                    if (x < w / 2f) {
+                        logic.jumpRight();
+                    } else {
+                        logic.jumpLeft();
+                    }
                 }
             });
 
             return true;
+
         } catch (Exception e) {
             e.printStackTrace();
-            return false;
+            return true;
         }
     }
 }

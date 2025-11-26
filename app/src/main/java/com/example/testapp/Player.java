@@ -15,7 +15,7 @@ public class Player {
     private boolean falling = false;
 
     // Save start position to reset after wrong step
-    private final float startX, startY, startZ;
+    private float startX, startY, startZ;
 
     // Player color
     private final float[] playerColor = {1f, 0.8f, 0.1f, 1f}; // Gold/yellow
@@ -67,6 +67,11 @@ public class Player {
         targetX = x;
         targetY = y;
         targetZ = z;
+    }
+
+    public void respawnToStart(float newStartZ) {
+        this.startZ = newStartZ;
+        respawn();
     }
 
     public void update() {

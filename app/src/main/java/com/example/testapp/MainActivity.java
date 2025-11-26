@@ -21,6 +21,9 @@ public class MainActivity extends AppCompatActivity {
     private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu, btnRestartWin, btnReturnMenuWin;
     private GameLogic logic;
 
+    private boolean winMenuShown = false;
+    private boolean isActivityDestroyed = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,94 +45,125 @@ public class MainActivity extends AppCompatActivity {
 
         logic = gameView.getRenderer().getLogic();
 
+        if (logic == null) {
+            return; // Emergency exit if logic failed to initialize
+        }
+
         btnStartGame.setOnClickListener(v -> {
-            logic.startGame();
+            if (logic == null || isActivityDestroyed) return;
             mainMenu.setVisibility(View.GONE);
+            winMenuShown = false;
+            logic.startGame();
         });
 
         btnResume.setOnClickListener(v -> {
+            if (logic == null || isActivityDestroyed) return;
             logic.resumeGame();
             pauseMenu.setVisibility(View.GONE);
         });
 
         btnRestartPause.setOnClickListener(v -> {
-            logic.startGame();
+            if (logic == null || isActivityDestroyed) return;
             pauseMenu.setVisibility(View.GONE);
+            winMenuShown = false;
+            logic.restartGame();
         });
 
         btnReturnMenu.setOnClickListener(v -> {
+            if (logic == null || isActivityDestroyed) return;
             logic.returnToMenu();
             pauseMenu.setVisibility(View.GONE);
             mainMenu.setVisibility(View.VISIBLE);
+            winMenuShown = false;
         });
 
         btnRestartWin.setOnClickListener(v -> {
-            logic.startGame();
+            if (logic == null || isActivityDestroyed) return;
             winMenu.setVisibility(View.GONE);
-            tvTimer.setText("Time: 0.00s");
+            winMenuShown = false;
+            logic.restartGame();
         });
 
         btnReturnMenuWin.setOnClickListener(v -> {
-            logic.returnToMenu();
+            if (logic == null || isActivityDestroyed) return;
             winMenu.setVisibility(View.GONE);
+            winMenuShown = false;
+            logic.returnToMenu();
             mainMenu.setVisibility(View.VISIBLE);
         });
 
         tickRunnable = new Runnable() {
             @Override
             public void run() {
-                updateTimerUI();
-                uiHandler.postDelayed(this, 100);
+                if (!isActivityDestroyed) {
+                    updateTimerUI();
+                    uiHandler.postDelayed(this, 100);
+                }
             }
         };
         uiHandler.post(tickRunnable);
     }
 
     private void updateTimerUI() {
-        if (logic == null) return;
+        if (logic == null || isActivityDestroyed) return;
 
-        double elapsed = logic.getElapsedSeconds();
-        tvTimer.setText(String.format("Time: %.2fs", elapsed));
+        try {
+            double elapsed = logic.getElapsedSeconds();
+            tvTimer.setText(String.format("Time: %.2fs", elapsed));
 
-        // Check if game was won and win menu is not already showing
-        if (logic.isGameWon() && winMenu.getVisibility() != View.VISIBLE) {
-            winMenu.setVisibility(View.VISIBLE);
-            double currentTime = logic.getElapsedSeconds();
-            double bestTime = logic.getBestTime();
-            TextView tvWinTime = findViewById(R.id.tvWinTime);
-            TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
-            tvWinTime.setText(String.format("You Won!\nTime: %.2fs", currentTime));
-            tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
-        }
+            // Show win menu only once
+            if (logic.isGameWon() && !winMenuShown) {
+                winMenuShown = true;
+                winMenu.setVisibility(View.VISIBLE);
+                double bestTime = logic.getBestTime();
+                TextView tvWinTime = findViewById(R.id.tvWinTime);
+                TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
+                if (tvWinTime != null && tvBestTimeWin != null) {
+                    tvWinTime.setText(String.format("You Won!\nTime: %.2fs", elapsed));
+                    tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
+                }
+            }
 
-        // Hide win menu if game is no longer won (restarted)
-        if (!logic.isGameWon() && winMenu.getVisibility() == View.VISIBLE) {
-            winMenu.setVisibility(View.GONE);
+            // Hide win menu if player returns to menu
+            if (!logic.isGameWon() && winMenuShown) {
+                winMenuShown = false;
+                winMenu.setVisibility(View.GONE);
+            }
+        } catch (Exception e) {
+            // Prevent crashes from UI updates
+            e.printStackTrace();
         }
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (logic == null) return super.onKeyDown(keyCode, event);
+        if (logic == null || isActivityDestroyed) return super.onKeyDown(keyCode, event);
 
         if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (logic.isPlaying()) {
                 logic.pauseGame();
                 pauseMenu.setVisibility(View.VISIBLE);
+                return true;
             } else if (logic.getGameState() == GameLogic.GameState.PAUSED) {
                 logic.resumeGame();
                 pauseMenu.setVisibility(View.GONE);
+                return true;
             }
-            return true;
+            // Don't intercept escape in menu or win states - let system handle it
+            return false;
         }
 
         if (!logic.isPlaying()) return true;
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
-            case KeyEvent.KEYCODE_A: logic.jumpLeft(); return true;
+            case KeyEvent.KEYCODE_A:
+                logic.jumpLeft();
+                return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-            case KeyEvent.KEYCODE_D: logic.jumpRight(); return true;
+            case KeyEvent.KEYCODE_D:
+                logic.jumpRight();
+                return true;
         }
 
         return super.onKeyDown(keyCode, event);
@@ -138,13 +172,33 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        gameView.onPause();
-        if (logic.isPlaying()) logic.pauseGame();
+        if (gameView != null) {
+            gameView.onPause();
+        }
+        if (logic != null && logic.isPlaying()) {
+            logic.pauseGame();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        gameView.onResume();
+        isActivityDestroyed = false;
+        if (gameView != null) {
+            gameView.onResume();
+        }
+        // Don't auto-resume - let player click resume button
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        isActivityDestroyed = true;
+        if (uiHandler != null && tickRunnable != null) {
+            uiHandler.removeCallbacks(tickRunnable);
+        }
+        if (gameView != null) {
+            gameView.onPause();
+        }
     }
 }

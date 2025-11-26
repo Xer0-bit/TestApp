@@ -10,7 +10,9 @@ public class GameSurfaceView extends GLSurfaceView {
 
     private final GameRenderer renderer;
 
-    public GameSurfaceView(Context context) { this(context, null); }
+    public GameSurfaceView(Context context) {
+        this(context, null);
+    }
 
     public GameSurfaceView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -22,48 +24,70 @@ public class GameSurfaceView extends GLSurfaceView {
         setFocusableInTouchMode(true);
     }
 
-    public GameRenderer getRenderer() { return renderer; }
+    public GameRenderer getRenderer() {
+        return renderer;
+    }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        GameLogic logic = renderer.getLogic();
+        try {
+            GameLogic logic = renderer.getLogic();
+            if (logic == null) return true;
 
-        // Only allow escape to work in any state, other keys only work during gameplay
-        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
-            return true; // let MainActivity handle it
-        }
+            // Escape key is handled by MainActivity
+            if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                return true;
+            }
 
-        // Block all other input if not playing
-        if (!logic.isPlaying()) {
-            return true; // consume input but don't use it
-        }
+            // Only allow gameplay input during PLAYING state
+            if (!logic.isPlaying()) {
+                return true;
+            }
 
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_LEFT:
-            case KeyEvent.KEYCODE_A:
-                logic.jumpRight(); return true;
-            case KeyEvent.KEYCODE_DPAD_RIGHT:
-            case KeyEvent.KEYCODE_D:
-                logic.jumpLeft(); return true;
-            default: return super.onKeyDown(keyCode, event);
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_A:
+                    logic.jumpRight();
+                    return true;
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_D:
+                    logic.jumpLeft();
+                    return true;
+                default:
+                    return super.onKeyDown(keyCode, event);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return true;
         }
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
+        try {
+            if (event.getAction() != MotionEvent.ACTION_DOWN) {
+                return true;
+            }
 
-        GameLogic logic = renderer.getLogic();
+            GameLogic logic = renderer.getLogic();
+            if (logic == null) return true;
 
-        // Only process touch input during gameplay
-        if (!logic.isPlaying()) {
-            return true; // consume but ignore
+            // Only process touch during PLAYING state
+            if (!logic.isPlaying()) {
+                return true;
+            }
+
+            float x = event.getX();
+            float w = getWidth();
+            if (x < w / 2f) {
+                logic.jumpRight();
+            } else {
+                logic.jumpLeft();
+            }
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return true;
         }
-
-        float x = event.getX();
-        float w = getWidth();
-        if (x < w / 2f) logic.jumpRight();
-        else logic.jumpLeft();
-        return true;
     }
 }

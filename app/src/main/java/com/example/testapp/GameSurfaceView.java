@@ -47,11 +47,11 @@ public class GameSurfaceView extends GLSurfaceView {
             switch (keyCode) {
                 case KeyEvent.KEYCODE_DPAD_LEFT:
                 case KeyEvent.KEYCODE_A:
-                    logic.jumpRight();  // Left key jumps to RIGHT platform
+                    logic.jumpRight();  // Left key jumps RIGHT (flipped for user perspective)
                     return true;
                 case KeyEvent.KEYCODE_DPAD_RIGHT:
                 case KeyEvent.KEYCODE_D:
-                    logic.jumpLeft();  // Right key jumps to LEFT platform
+                    logic.jumpLeft();  // Right key jumps LEFT (flipped for user perspective)
                     return true;
                 default:
                     return super.onKeyDown(keyCode, event);
@@ -80,11 +80,11 @@ public class GameSurfaceView extends GLSurfaceView {
             float x = event.getX();
             float w = getWidth();
 
-            // FIXED: Left side = jump left, Right side = jump right
+            // Left side of screen = jump RIGHT, Right side = jump LEFT (flipped for user perspective)
             if (x < w / 2f) {
-                logic.jumpLeft();
-            } else {
                 logic.jumpRight();
+            } else {
+                logic.jumpLeft();
             }
             return true;
         } catch (Exception e) {

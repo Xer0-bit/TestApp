@@ -13,11 +13,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final long UI_UPDATE_INTERVAL_MS = 100;
+    private static final long UI_UPDATE_INTERVAL_MS = 50; // Faster updates for smoother timer
 
     private GameSurfaceView gameView;
     private Handler uiHandler;
-    private TextView tvTimer;
+    private TextView tvTimer, tvBestTime;
     private Runnable tickRunnable;
 
     private LinearLayout mainMenu, pauseMenu, winMenu;
@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         gameView = findViewById(R.id.gameView);
         tvTimer = findViewById(R.id.tvTimer);
+        tvBestTime = findViewById(R.id.tvBestTime);
 
         mainMenu = findViewById(R.id.mainMenu);
         pauseMenu = findViewById(R.id.pauseMenu);
@@ -144,11 +145,17 @@ public class MainActivity extends AppCompatActivity {
             double elapsed = logic.getElapsedSeconds();
             tvTimer.setText(String.format("Time: %.2fs", elapsed));
 
+            // Update best time display
+            double bestTime = logic.getBestTime();
+            if (bestTime > 0) {
+                tvBestTime.setVisibility(View.VISIBLE);
+                tvBestTime.setText(String.format("Best: %.2fs", bestTime));
+            }
+
             // Show win menu only once
             if (logic.isGameWon() && !winMenuShown) {
                 winMenuShown = true;
                 winMenu.setVisibility(View.VISIBLE);
-                double bestTime = logic.getBestTime();
                 TextView tvWinTime = findViewById(R.id.tvWinTime);
                 TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
                 if (tvWinTime != null && tvBestTimeWin != null) {
@@ -163,7 +170,6 @@ public class MainActivity extends AppCompatActivity {
                 winMenu.setVisibility(View.GONE);
             }
         } catch (Exception e) {
-            // Prevent crashes from UI updates
             e.printStackTrace();
         }
     }
@@ -182,7 +188,6 @@ public class MainActivity extends AppCompatActivity {
                 pauseMenu.setVisibility(View.GONE);
                 return true;
             }
-            // Don't intercept escape in menu or win states - let system handle it
             return false;
         }
 
@@ -191,11 +196,11 @@ public class MainActivity extends AppCompatActivity {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_A:
-                logic.jumpRight(); // Left key jumps to RIGHT platform
+                logic.jumpRight(); // Left key jumps RIGHT (flipped for user perspective)
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_D:
-                logic.jumpLeft(); // Right key jumps to LEFT platform
+                logic.jumpLeft(); // Right key jumps LEFT (flipped for user perspective)
                 return true;
         }
 
@@ -220,7 +225,6 @@ public class MainActivity extends AppCompatActivity {
         if (gameView != null) {
             gameView.onResume();
         }
-        // Don't auto-resume - let player click resume button
     }
 
     @Override
@@ -236,7 +240,10 @@ public class MainActivity extends AppCompatActivity {
             gameView.onPause();
         }
 
-        // Release OpenGL resources
+        if (logic != null) {
+            logic.cleanup();
+        }
+
         if (gameView != null && gameView.getRenderer() != null) {
             gameView.getRenderer().release();
         }

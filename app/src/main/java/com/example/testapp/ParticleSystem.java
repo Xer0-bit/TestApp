@@ -12,9 +12,7 @@ public class ParticleSystem {
 
     private static final float GRAVITY = 0.02f;
     private static final float PARTICLE_LIFETIME_STEP = 0.016f; // ~60fps
-    private static final float SPHERE_RADIUS = 0.1f;
-    private static final int SPHERE_LATS = 6;
-    private static final int SPHERE_LONS = 6;
+    private static final int COORDS_PER_VERTEX = 3;
 
     // Particle counts
     private static final int BREAK_PARTICLE_COUNT = 12;
@@ -67,40 +65,61 @@ public class ParticleSystem {
     private float[] modelMatrix = new float[16];
     private float[] mvpMatrix = new float[16];
 
-    private static final float[] SPHERE_VERTICES = generateSphere(SPHERE_RADIUS, SPHERE_LATS, SPHERE_LONS);
-    private static FloatBuffer sphereBuffer;
+    // Simple cube for particles (more efficient than spheres)
+    private static final float PARTICLE_SIZE = 0.1f;
+    private static final float[] CUBE_VERTICES = {
+            // Front face
+            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            // Back face
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            // Top face
+            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            // Bottom face
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            // Right face
+            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
+            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            // Left face
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
+            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE
+    };
+
+    private static FloatBuffer particleBuffer;
 
     static {
-        ByteBuffer bb = ByteBuffer.allocateDirect(SPHERE_VERTICES.length * 4);
+        ByteBuffer bb = ByteBuffer.allocateDirect(CUBE_VERTICES.length * 4);
         bb.order(ByteOrder.nativeOrder());
-        sphereBuffer = bb.asFloatBuffer();
-        sphereBuffer.put(SPHERE_VERTICES);
-        sphereBuffer.position(0);
-    }
-
-    private static float[] generateSphere(float radius, int lats, int lons) {
-        ArrayList<Float> vertices = new ArrayList<>();
-        for (int i = 0; i <= lats; i++) {
-            float lat = (float) (Math.PI * i / lats);
-            float sinLat = (float) Math.sin(lat);
-            float cosLat = (float) Math.cos(lat);
-
-            for (int j = 0; j <= lons; j++) {
-                float lon = (float) (2 * Math.PI * j / lons);
-                float sinLon = (float) Math.sin(lon);
-                float cosLon = (float) Math.cos(lon);
-
-                vertices.add(radius * sinLat * cosLon);
-                vertices.add(radius * cosLat);
-                vertices.add(radius * sinLat * sinLon);
-            }
-        }
-
-        float[] result = new float[vertices.size()];
-        for (int i = 0; i < vertices.size(); i++) {
-            result[i] = vertices.get(i);
-        }
-        return result;
+        particleBuffer = bb.asFloatBuffer();
+        particleBuffer.put(CUBE_VERTICES);
+        particleBuffer.position(0);
     }
 
     public void spawnBreakEffect(float x, float y, float z) {
@@ -156,11 +175,11 @@ public class ParticleSystem {
             GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
             GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
 
-            sphereBuffer.position(0);
+            particleBuffer.position(0);
             GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
-            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3,
-                    GLES20.GL_FLOAT, false, 0, sphereBuffer);
-            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, SPHERE_VERTICES.length / 3);
+            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
+                    GLES20.GL_FLOAT, false, 0, particleBuffer);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, CUBE_VERTICES.length / COORDS_PER_VERTEX);
             GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
         }
     }

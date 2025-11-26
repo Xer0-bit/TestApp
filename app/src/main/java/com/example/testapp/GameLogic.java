@@ -18,7 +18,7 @@ public class GameLogic {
     private static final float JUMP_LAND_SHAKE = 0.15f;
     private static final float GLASS_BREAK_SHAKE = 0.25f;
     private static final float SHAKE_DECAY_RATE = 3.0f;
-    private static final long RESPAWN_DELAY_MS = 1000;
+    private static final long RESPAWN_DELAY_MS = 200;
     private static final long POST_RESPAWN_COOLDOWN_MS = 250;
     private static final long LAND_EFFECT_DELAY_MS = 300;
     private static final float MAX_DELTA_TIME = 0.05f;
@@ -46,6 +46,9 @@ public class GameLogic {
     private long lastJumpTime = 0;
     private long lastFrameTime = 0;
     private boolean isRespawning = false;
+
+    // Track if handler is active to prevent memory leaks
+    private volatile boolean isActive = true;
 
     public GameLogic() {
         handler = new Handler(Looper.getMainLooper());
@@ -75,7 +78,7 @@ public class GameLogic {
 
         nextPlatform = 0;
         shakeAmount = 0f;
-        lastJumpTime = 0; // Reset to allow immediate first jump
+        lastJumpTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         isRespawning = false;
 
@@ -95,7 +98,8 @@ public class GameLogic {
         winTime = 0;
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
-        lastJumpTime = 0; // Allow immediate first jump
+        // Set lastJumpTime to past to allow immediate first jump
+        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
     }
 
     public void restartGame() {
@@ -105,7 +109,8 @@ public class GameLogic {
         winTime = 0;
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
-        lastJumpTime = 0; // Allow immediate first jump
+        // Set lastJumpTime to past to allow immediate first jump
+        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
     }
 
     public void pauseGame() {
@@ -140,11 +145,10 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
-        if (platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
+        if (!isActive || platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
             return;
         }
 
-        // Prevent input during respawn animation
         if (isRespawning) {
             return;
         }
@@ -161,12 +165,14 @@ public class GameLogic {
             player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
             nextPlatform++;
 
-            handler.postDelayed(() -> {
-                if (player != null && particles != null && state == GameState.PLAYING) {
-                    particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
-                    shakeAmount = JUMP_LAND_SHAKE;
-                }
-            }, LAND_EFFECT_DELAY_MS);
+            if (isActive) {
+                handler.postDelayed(() -> {
+                    if (isActive && player != null && particles != null && state == GameState.PLAYING) {
+                        particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
+                        shakeAmount = JUMP_LAND_SHAKE;
+                    }
+                }, LAND_EFFECT_DELAY_MS);
+            }
 
             if (nextPlatform >= TOTAL_PLATFORMS) {
                 winGame();
@@ -184,15 +190,17 @@ public class GameLogic {
                 player.fall();
                 isRespawning = true;
 
-                handler.postDelayed(() -> {
-                    if (player != null && state == GameState.PLAYING) {
-                        player.respawn();
-                        nextPlatform = 0;
-                        isRespawning = false;
-                        // Force cooldown after respawn
-                        lastJumpTime = SystemClock.uptimeMillis() + POST_RESPAWN_COOLDOWN_MS;
-                    }
-                }, RESPAWN_DELAY_MS);
+                if (isActive) {
+                    handler.postDelayed(() -> {
+                        if (isActive && player != null && state == GameState.PLAYING) {
+                            player.respawn();
+                            nextPlatform = 0;
+                            isRespawning = false;
+                            // Set lastJumpTime to past to allow immediate jump after respawn
+                            lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+                        }
+                    }, RESPAWN_DELAY_MS);
+                }
             }
         }
     }
@@ -215,16 +223,14 @@ public class GameLogic {
     }
 
     public void update() {
-        if (state != GameState.PLAYING) return;
+        if (state != GameState.PLAYING || !isActive) return;
 
         if (player == null || platforms == null) return;
 
-        // Calculate delta time
         long currentTime = SystemClock.uptimeMillis();
         float deltaTime = (currentTime - lastFrameTime) / 1000.0f;
         lastFrameTime = currentTime;
 
-        // Clamp deltaTime to prevent large jumps
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
         player.update();
@@ -239,7 +245,6 @@ public class GameLogic {
             particles.update();
         }
 
-        // Decay shake with proper delta time
         if (shakeAmount > 0) {
             shakeAmount = Math.max(0f, shakeAmount - SHAKE_DECAY_RATE * deltaTime);
         }
@@ -284,6 +289,7 @@ public class GameLogic {
     public double getBestTime() { return bestTime == Double.MAX_VALUE ? 0 : bestTime; }
 
     public void cleanup() {
+        isActive = false;
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }

@@ -6,6 +6,10 @@ public class Player {
     public float y = 1.0f;
     public float z = 0f;
 
+    float jumpSpeed = 0.2f;
+    float targetX, targetY, targetZ;
+    boolean jumping = false;
+
     private boolean falling = false;
 
     public void jumpTo(float targetX, float targetY, float targetZ) {
@@ -15,14 +19,25 @@ public class Player {
         falling = false;
     }
 
+
     public void fall() {
         falling = true;
     }
 
     public void update() {
-        if (falling) {
-            y -= 0.2f;
+        if (jumping) {
+            float dx = targetX - x;
+            float dy = targetY - y;
+            if (Math.abs(dx) < 0.01f && Math.abs(dy) < 0.01f) {
+                x = targetX;
+                y = targetY;
+                jumping = false;
+            } else {
+                x += dx * jumpSpeed;
+                y += dy * jumpSpeed;
+            }
         }
+        if (falling) y -= 0.2f;
     }
 
     public void draw(float[] vpMatrix) {

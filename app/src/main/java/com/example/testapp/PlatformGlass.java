@@ -1,5 +1,7 @@
 package com.example.testapp;
 
+import android.opengl.Matrix;
+
 public class PlatformGlass {
 
     private int index;
@@ -7,6 +9,13 @@ public class PlatformGlass {
 
     private boolean leftBroken = false;
     private boolean rightBroken = false;
+
+    // animation progress (0 = intact, 1 = fully fallen)
+    private float breakProgressLeft = 0f;
+    private float breakProgressRight = 0f;
+
+    private static final float FALL_SPEED = 0.05f;
+    private static final float ROTATE_SPEED = 2f; // degrees per frame
 
     public PlatformGlass(int idx, boolean correctLeft) {
         index = idx;
@@ -29,42 +38,42 @@ public class PlatformGlass {
         return -5f - index * 3f;
     }
 
-
-    float breakProgress = 0f; // 0 = intact, 1 = fully fallen
     public void breakSide(boolean left) {
-        if (!leftBroken) {
-            Cube leftCube = new Cube(-1.5f, y - breakProgress, z);
-            leftCube.size = 1.5f;
-            leftCube.draw(vpMatrix, glassColor);
-        }
-
-        if (!rightBroken) {
-            Cube rightCube = new Cube(1.5f, y - breakProgress, z);
-            rightCube.size = 1.5f;
-            rightCube.draw(vpMatrix, glassColor);
-        }
-
+        if (left) leftBroken = true;
+        else rightBroken = true;
     }
 
+    public void update() {
+        if (leftBroken && breakProgressLeft < 1f) breakProgressLeft += FALL_SPEED;
+        if (rightBroken && breakProgressRight < 1f) breakProgressRight += FALL_SPEED;
+    }
 
     public void draw(float[] vpMatrix) {
         float y = getY();
-        float z = -5f - index * 3f; // platforms extend forward away from camera
-        float platformSpacing = 3.0f;
-        float z = player.z - (index + 1) * platformSpacing; // platforms extend away from player
-
+        float z = getZ();
         float[] glassColor = {0.4f, 0.8f, 1f, 0.45f};
 
-        if (!leftBroken) {
-            Cube left = new Cube(-1.5f, y, z);
-            left.size = 1.5f;
-            left.draw(vpMatrix, glassColor);
+        // LEFT PLATFORM
+        if (!leftBroken || breakProgressLeft < 1f) {
+            Cube leftCube = new Cube(-1.5f, y, z);
+            leftCube.size = 1.5f;
+            // apply falling animation
+            leftCube.y = y - breakProgressLeft * 3f; // slide down
+            leftCube.modelRotationX = breakProgressLeft * 45f; // tilt
+            leftCube.drawWithRotation(vpMatrix, glassColor);
         }
 
-        if (!rightBroken) {
-            Cube right = new Cube(1.5f, y, z);
-            right.size = 1.5f;
-            right.draw(vpMatrix, glassColor);
+        // RIGHT PLATFORM
+        if (!rightBroken || breakProgressRight < 1f) {
+            Cube rightCube = new Cube(1.5f, y, z);
+            rightCube.size = 1.5f;
+            rightCube.y = y - breakProgressRight * 3f;
+            rightCube.modelRotationX = breakProgressRight * 45f;
+            rightCube.drawWithRotation(vpMatrix, glassColor);
         }
+    }
+
+    public boolean allFallen() {
+        return breakProgressLeft >= 1f && breakProgressRight >= 1f;
     }
 }

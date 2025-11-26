@@ -1,6 +1,7 @@
 package com.example.testapp;
 
 import java.util.Random;
+import android.os.Handler;
 
 public class GameLogic {
 
@@ -17,6 +18,8 @@ public class GameLogic {
     private boolean running = false;
 
     public long bestTime = Long.MAX_VALUE;
+
+    private Handler handler = new Handler();
 
     public GameLogic() {
         resetGame();
@@ -45,7 +48,7 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
-        if (!running) return; // ignore input if not running
+        if (!running) return;
         if (currentJump >= TOTAL_JUMPS) return;
 
         PlatformGlass p = platforms[currentJump];
@@ -62,23 +65,36 @@ public class GameLogic {
 
         } else {
             player.fall();
-            p.breakSide(left); // Only break the incorrect side
+            p.breakSide(left);
+
+            // Reset after fall
+            handler.postDelayed(this::resetGame, 1000);
         }
     }
 
     public void update() {
         player.update();
+
+        // Update platforms animations
+        for (PlatformGlass p : platforms) {
+            p.update();
+        }
+
+        // Reset player if he fell below visible
+        if (!player.isJumping() && !player.isFalling()) return;
+        if (player.y < -4f) {
+            handler.postDelayed(this::resetGame, 1000);
+        }
     }
 
     public void draw(float[] vpMatrix) {
-        for (PlatformGlass p : platforms)
+        for (PlatformGlass p : platforms) {
             p.draw(vpMatrix);
-
+        }
         player.draw(vpMatrix);
     }
 
-    // --- New methods for MainActivity --- //
-
+    // --- Controls for MainActivity ---
     public void start() {
         resetGame();
         running = true;

@@ -43,6 +43,8 @@ public class Cube {
 
     public float x, y, z;
     public float size = 1f;
+    public float modelRotationX = 0f;
+
 
     private final float[] modelMatrix = new float[16];
     private final float[] mvpMatrix = new float[16];
@@ -80,4 +82,28 @@ public class Cube {
 
         GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
     }
+
+    public void drawWithRotation(float[] vpMatrix, float[] colorRGBA) {
+        if (ShaderHelper.program == -1) return;
+        GLES20.glUseProgram(ShaderHelper.program);
+
+        // model matrix
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y, z);
+        Matrix.rotateM(modelMatrix, 0, modelRotationX, 1f, 0f, 0f);
+        Matrix.scaleM(modelMatrix, 0, size, 0.05f, size);
+
+        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+
+        GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, colorRGBA, 0);
+
+        vertexBuffer.position(0);
+        GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+        GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3, GLES20.GL_FLOAT, false, 0, vertexBuffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, VERTICES.length / 3);
+        GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
+    }
+
+
 }

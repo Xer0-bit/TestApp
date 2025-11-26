@@ -95,72 +95,102 @@ public class PlatformGlass {
     }
 
     public void draw(float[] vpMatrix) {
-        // Start and finish platforms are black and full-width
+        // Start and finish platforms - Ancient stone platforms
         if (isStart || isFinish) {
-            float[] platformColor = {0.1f, 0.1f, 0.1f, 0.9f}; // Black/dark gray
-            Cube c = new Cube(0f, y, z); // Centered
-            c.size = PLATFORM_SIZE * 2.2f; // Wide enough to cover both sides
+            float[] stoneColor = {0.25f, 0.2f, 0.15f, 0.95f}; // Dark weathered stone
+            float[] glowColor = isFinish
+                    ? new float[]{0.4f, 0.8f, 0.3f, 0.6f}  // Green magical glow for finish
+                    : new float[]{0.5f, 0.5f, 0.8f, 0.6f}; // Blue magical glow for start
+
+            // Main stone platform
+            Cube c = new Cube(0f, y, z);
+            c.size = PLATFORM_SIZE * 2.2f;
             c.modelRotationX = 0;
-            c.drawWithRotation(vpMatrix, platformColor);
+            c.drawWithRotation(vpMatrix, stoneColor);
+
+            // Glowing runes underneath
+            Cube glow = new Cube(0f, y - 0.15f, z);
+            glow.size = PLATFORM_SIZE * 2.0f;
+            glow.modelRotationX = 0;
+            glow.drawWithRotation(vpMatrix, glowColor);
+
             return;
         }
 
-        // Regular glass platforms
-        float[] glassColor = {0.4f, 0.8f, 1f, 0.45f}; // Blue
+        // Mystical glass platforms with magical energy
+        float time = android.os.SystemClock.uptimeMillis() / 1000f;
+        float pulse = (float) Math.sin(time * 2f + z * 0.5f) * 0.1f + 0.35f;
+
+        float[] glassColor = {0.3f, 0.6f, 0.9f, pulse}; // Shimmering blue-cyan
+        float[] edgeGlow = {0.5f, 0.8f, 1f, pulse * 0.5f}; // Bright edge glow
 
         // Draw left platform
         if (!leftBroken || breakProgressLeft < 1f) {
             if (leftBroken) {
-                // Draw shattered pieces
                 drawShatteredPieces(vpMatrix, xLeft, y - breakProgressLeft * MAX_FALL_DISTANCE, z,
                         rotationLeft, breakProgressLeft);
             } else {
-                // Draw intact platform
+                // Main glass platform
                 Cube c = new Cube(xLeft, y, z);
                 c.size = PLATFORM_SIZE;
                 c.modelRotationX = 0;
                 c.drawWithRotation(vpMatrix, glassColor);
+
+                // Glowing magical border
+                Cube border = new Cube(xLeft, y - 0.08f, z);
+                border.size = PLATFORM_SIZE * 1.1f;
+                border.modelRotationX = 0;
+                border.drawWithRotation(vpMatrix, edgeGlow);
             }
         }
 
         // Draw right platform
         if (!rightBroken || breakProgressRight < 1f) {
             if (rightBroken) {
-                // Draw shattered pieces
                 drawShatteredPieces(vpMatrix, xRight, y - breakProgressRight * MAX_FALL_DISTANCE, z,
                         rotationRight, breakProgressRight);
             } else {
-                // Draw intact platform
+                // Main glass platform
                 Cube c = new Cube(xRight, y, z);
                 c.size = PLATFORM_SIZE;
                 c.modelRotationX = 0;
                 c.drawWithRotation(vpMatrix, glassColor);
+
+                // Glowing magical border
+                Cube border = new Cube(xRight, y - 0.08f, z);
+                border.size = PLATFORM_SIZE * 1.1f;
+                border.modelRotationX = 0;
+                border.drawWithRotation(vpMatrix, edgeGlow);
             }
         }
     }
 
     private void drawShatteredPieces(float[] vpMatrix, float baseX, float baseY, float baseZ,
                                      float rotation, float progress) {
-        // Red color for breaking glass
-        float alpha = 0.45f * (1f - progress * 0.7f);
-        float[] breakColor = {0.8f, 0.2f, 0.2f, alpha};
+        // Mystical breaking effect - pieces turn from blue to purple/red as they shatter
+        float alpha = 0.6f * (1f - progress * 0.7f);
 
-        // Spread multiplier - pieces fly apart as they fall
+        // Color shift from blue to fiery red-purple as it breaks
+        float r = 0.3f + progress * 0.6f;  // Gets more red
+        float g = 0.6f - progress * 0.5f;  // Loses green
+        float b = 0.9f - progress * 0.3f;  // Slightly loses blue
+
+        float[] breakColor = {r, g, b, alpha};
+
+        // Add magical particle trail effect
+        float[] trailColor = {0.9f, 0.4f, 0.9f, alpha * 0.3f}; // Purple trail
+
         float spread = progress * 0.8f;
-
-        // Draw 4 pieces in a 2x2 grid pattern
         float pieceSize = PLATFORM_SIZE * 0.4f;
         float offset = PLATFORM_SIZE * 0.25f;
 
-        // Piece positions relative to center
         float[][] pieceOffsets = {
-                {-offset, 0, -offset},  // Top-left
-                {offset, 0, -offset},   // Top-right
-                {-offset, 0, offset},   // Bottom-left
-                {offset, 0, offset}     // Bottom-right
+                {-offset, 0, -offset},
+                {offset, 0, -offset},
+                {-offset, 0, offset},
+                {offset, 0, offset}
         };
 
-        // Different rotation speeds for each piece
         float[] rotationMultipliers = {1.2f, 0.8f, 1.5f, 0.9f};
 
         for (int i = 0; i < 4; i++) {
@@ -168,10 +198,19 @@ public class PlatformGlass {
             float py = baseY + pieceOffsets[i][1];
             float pz = baseZ + pieceOffsets[i][2] * (1 + spread);
 
+            // Main shattered piece
             Cube c = new Cube(px, py, pz);
             c.size = pieceSize;
             c.modelRotationX = rotation * rotationMultipliers[i];
             c.drawWithRotation(vpMatrix, breakColor);
+
+            // Magical trail effect behind each piece
+            if (progress > 0.2f) {
+                Cube trail = new Cube(px, py + 0.2f, pz - 0.3f);
+                trail.size = pieceSize * 0.7f;
+                trail.modelRotationX = rotation * rotationMultipliers[i] * 0.5f;
+                trail.drawWithRotation(vpMatrix, trailColor);
+            }
         }
     }
 }

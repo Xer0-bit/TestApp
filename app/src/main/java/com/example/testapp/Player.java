@@ -1,5 +1,7 @@
 package com.example.testapp;
 
+import android.opengl.GLES20;
+
 public class Player {
 
     private static final float JUMP_SPEED = 0.15f;
@@ -17,8 +19,8 @@ public class Player {
     // Save start position to reset after wrong step
     private float startX, startY, startZ;
 
-    // Player color
-    private final float[] playerColor = {1f, 0.8f, 0.1f, 1f}; // Gold/yellow
+    // Player color - Mystical glowing entity
+    private float[] playerColor = {0.9f, 0.7f, 0.3f, 1f}; // Golden magical glow
 
     public Player(float startX, float startY, float startZ) {
         this.startX = startX;
@@ -104,9 +106,131 @@ public class Player {
     }
 
     public void draw(float[] vpMatrix) {
-        Cube c = new Cube(x, y, z);
-        c.size = PLAYER_SIZE;
-        c.modelRotationX = 0;
-        c.draw(vpMatrix, playerColor);
+        // Animated time
+        float time = android.os.SystemClock.uptimeMillis() / 1000f;
+        float bobAmount = (float) Math.sin(time * 3f) * 0.03f;
+        float starPulse = (float) Math.sin(time * 4f) * 0.15f + 0.85f;
+
+        // Wizard robe body (more subtle taper)
+        float[] robeColor = {0.25f, 0.2f, 0.45f, 1f}; // Dark purple robe
+
+        // Lower robe (slightly wider)
+        Cube robeLower = new Cube(x, y + PLAYER_SIZE * 0.25f + bobAmount, z);
+        robeLower.size = PLAYER_SIZE * 1.05f;
+        robeLower.modelRotationX = 0;
+        robeLower.draw(vpMatrix, robeColor);
+
+        // Mid robe
+        Cube robeMid = new Cube(x, y + PLAYER_SIZE * 0.5f + bobAmount, z);
+        robeMid.size = PLAYER_SIZE * 1.0f;
+        robeMid.modelRotationX = 0;
+        robeMid.draw(vpMatrix, robeColor);
+
+        // Upper robe/chest
+        Cube robeUpper = new Cube(x, y + PLAYER_SIZE * 0.75f + bobAmount, z);
+        robeUpper.size = PLAYER_SIZE * 0.95f;
+        robeUpper.modelRotationX = 0;
+        robeUpper.draw(vpMatrix, robeColor);
+
+        // Shoulders (connect body to arms better)
+        float[] shoulderColor = {0.2f, 0.15f, 0.4f, 1f}; // Slightly darker purple
+        Cube shoulders = new Cube(x, y + PLAYER_SIZE * 0.95f + bobAmount, z);
+        shoulders.size = PLAYER_SIZE * 1.1f;
+        shoulders.modelRotationX = 0;
+        shoulders.draw(vpMatrix, shoulderColor);
+
+        // Belt/sash (golden)
+        float[] beltColor = {0.7f, 0.6f, 0.2f, 1f};
+        Cube belt = new Cube(x, y + PLAYER_SIZE * 0.6f + bobAmount, z);
+        belt.size = PLAYER_SIZE * 1.0f;
+        belt.modelRotationX = 0;
+        belt.draw(vpMatrix, beltColor);
+
+        // Arms (sleeves connecting to hands)
+        float[] sleeveColor = {0.22f, 0.18f, 0.42f, 1f};
+
+        // Left arm/sleeve
+        Cube leftSleeve = new Cube(x - PLAYER_SIZE * 0.55f, y + PLAYER_SIZE * 0.8f + bobAmount, z);
+        leftSleeve.size = PLAYER_SIZE * 0.35f;
+        leftSleeve.modelRotationX = 0;
+        leftSleeve.draw(vpMatrix, sleeveColor);
+
+        // Right arm/sleeve
+        Cube rightSleeve = new Cube(x + PLAYER_SIZE * 0.55f, y + PLAYER_SIZE * 0.8f + bobAmount, z);
+        rightSleeve.size = PLAYER_SIZE * 0.35f;
+        rightSleeve.modelRotationX = 0;
+        rightSleeve.draw(vpMatrix, sleeveColor);
+
+        // Hands (skin tone)
+        float[] handColor = {0.9f, 0.75f, 0.6f, 1f};
+
+        // Left hand
+        Cube leftHand = new Cube(x - PLAYER_SIZE * 0.7f, y + PLAYER_SIZE * 0.65f + bobAmount, z);
+        leftHand.size = PLAYER_SIZE * 0.3f;
+        leftHand.modelRotationX = 0;
+        leftHand.draw(vpMatrix, handColor);
+
+        // Right hand
+        Cube rightHand = new Cube(x + PLAYER_SIZE * 0.7f, y + PLAYER_SIZE * 0.65f + bobAmount, z);
+        rightHand.size = PLAYER_SIZE * 0.3f;
+        rightHand.modelRotationX = 0;
+        rightHand.draw(vpMatrix, handColor);
+
+        // Wizard head (neck area to head top)
+        Cube neck = new Cube(x, y + PLAYER_SIZE * 1.05f + bobAmount, z);
+        neck.size = PLAYER_SIZE * 0.5f;
+        neck.modelRotationX = 0;
+        neck.draw(vpMatrix, handColor);
+
+        Cube head = new Cube(x, y + PLAYER_SIZE * 1.3f + bobAmount, z);
+        head.size = PLAYER_SIZE * 0.6f;
+        head.modelRotationX = 0;
+        head.draw(vpMatrix, handColor);
+
+        // Wizard hat (tall pointy hat)
+        float[] hatColor = {0.2f, 0.15f, 0.35f, 1f}; // Dark purple
+
+        // Hat brim
+        Cube hatBrim = new Cube(x, y + PLAYER_SIZE * 1.55f + bobAmount, z);
+        hatBrim.size = PLAYER_SIZE * 0.9f;
+        hatBrim.modelRotationX = 0;
+        hatBrim.draw(vpMatrix, hatColor);
+
+        // Hat cone - stacked to make it tall and pointy
+        Cube hatBase = new Cube(x, y + PLAYER_SIZE * 1.75f + bobAmount, z);
+        hatBase.size = PLAYER_SIZE * 0.7f;
+        hatBase.modelRotationX = 0;
+        hatBase.draw(vpMatrix, hatColor);
+
+        Cube hatMid = new Cube(x, y + PLAYER_SIZE * 2.0f + bobAmount, z);
+        hatMid.size = PLAYER_SIZE * 0.5f;
+        hatMid.modelRotationX = 0;
+        hatMid.draw(vpMatrix, hatColor);
+
+        Cube hatTop = new Cube(x, y + PLAYER_SIZE * 2.25f + bobAmount, z);
+        hatTop.size = PLAYER_SIZE * 0.3f;
+        hatTop.modelRotationX = 0;
+        hatTop.draw(vpMatrix, hatColor);
+
+        // Golden stars on hat (pulsing)
+        float[] starColor = {1f, 0.9f, 0.3f, starPulse};
+
+        // Star 1
+        Cube star1 = new Cube(x - PLAYER_SIZE * 0.2f, y + PLAYER_SIZE * 1.7f + bobAmount, z + PLAYER_SIZE * 0.35f);
+        star1.size = PLAYER_SIZE * 0.12f;
+        star1.modelRotationX = time * 80f;
+        star1.drawWithRotation(vpMatrix, starColor);
+
+        // Star 2
+        Cube star2 = new Cube(x + PLAYER_SIZE * 0.15f, y + PLAYER_SIZE * 2.0f + bobAmount, z + PLAYER_SIZE * 0.3f);
+        star2.size = PLAYER_SIZE * 0.1f;
+        star2.modelRotationX = -time * 100f;
+        star2.drawWithRotation(vpMatrix, starColor);
+
+        // Star 3 (on tip)
+        Cube star3 = new Cube(x, y + PLAYER_SIZE * 2.35f + bobAmount, z + PLAYER_SIZE * 0.2f);
+        star3.size = PLAYER_SIZE * 0.08f;
+        star3.modelRotationX = time * 120f;
+        star3.drawWithRotation(vpMatrix, starColor);
     }
 }

@@ -58,6 +58,10 @@ public class Cube {
         this.z = z;
     }
 
+    public static FloatBuffer getStaticVertexBuffer() {
+        return vertexBuffer;
+    }
+
     public void draw(float[] vpMatrix, float[] colorRGBA) {
         if (ShaderHelper.program == -1) return;
         GLES20.glUseProgram(ShaderHelper.program);

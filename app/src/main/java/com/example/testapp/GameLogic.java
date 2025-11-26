@@ -72,9 +72,7 @@ public class GameLogic {
 
     public void draw(float[] vpMatrix) {
         for (PlatformGlass p : platforms)
-            p.draw(vpMatrix);
-
-        player.draw(vpMatrix);
+            p.update();
     }
 
     // --- New methods for MainActivity --- //

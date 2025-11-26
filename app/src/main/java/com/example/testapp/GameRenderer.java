@@ -41,14 +41,18 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         float aspect = (float) width / height;
         Matrix.perspectiveM(projectionMatrix, 0, 45f, aspect, 0.1f, 150f);
-        float camX = player.x;
-        float camY = player.y + 5f;  // high above
-        float camZ = player.z + 10f; // behind player
-        Matrix.setLookAtM(viewMatrix, 0,
-                camX, camY, camZ,     // camera position
-                camX, player.y, player.z, // look at player
-                0f, 1f, 0f);          // up vector
 
+        // get the player from game logic
+        Player player = logic.player;
+
+        float camX = player.x;
+        float camY = player.y + 5f;  // camera high above
+        float camZ = player.z + 10f; // camera behind player
+
+        Matrix.setLookAtM(viewMatrix, 0,
+                camX, camY, camZ,          // camera position
+                camX, player.y, player.z,  // look at player
+                0f, 1f, 0f);               // up vector
     }
 
     @Override

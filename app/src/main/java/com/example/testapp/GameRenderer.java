@@ -7,11 +7,13 @@ import android.opengl.Matrix;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
+import java.util.Random;
 
 public class GameRenderer implements GLSurfaceView.Renderer {
 
     private GameLogic logic;
     private Context context;
+    private Random shakeRandom = new Random();
 
     public static float[] projectionMatrix = new float[16];
     public static float[] viewMatrix = new float[16];
@@ -49,19 +51,25 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         Player player = logic.player;
 
+        // Get screen shake
+        float shake = logic.getShakeAmount();
+        float shakeX = (shakeRandom.nextFloat() - 0.5f) * shake;
+        float shakeY = (shakeRandom.nextFloat() - 0.5f) * shake;
+        float shakeZ = (shakeRandom.nextFloat() - 0.5f) * shake;
+
         // Camera positioned above and behind, looking down the platforms
         float camHeight = 4f;   // Y offset above the platforms
         float camDistance = 8f; // distance behind the player along Z
 
         // Camera stays centered between the left and right platforms (X = 0)
-        float camX = 0f;
-        float camY = player.y + camHeight;
-        float camZ = player.z - camDistance;
+        float camX = shakeX;
+        float camY = player.y + camHeight + shakeY;
+        float camZ = player.z - camDistance + shakeZ;
 
         // Look at point: centered between platforms, slightly ahead of player
-        float lookX = 0f;
-        float lookY = player.y;
-        float lookZ = player.z + 5f; // look ahead at upcoming platforms
+        float lookX = shakeX * 0.5f;
+        float lookY = player.y + shakeY * 0.5f;
+        float lookZ = player.z + 5f + shakeZ * 0.5f; // look ahead at upcoming platforms
 
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,

@@ -43,33 +43,33 @@ public class MainActivity extends AppCompatActivity {
         logic = gameView.getRenderer().getLogic();
 
         btnStartGame.setOnClickListener(v -> {
-            logic.start();
+            logic.startGame();
             mainMenu.setVisibility(View.GONE);
         });
 
         btnResume.setOnClickListener(v -> {
-            logic.resume();
+            logic.resumeGame();
             pauseMenu.setVisibility(View.GONE);
         });
 
         btnRestartPause.setOnClickListener(v -> {
-            logic.restart();
+            logic.startGame();
             pauseMenu.setVisibility(View.GONE);
         });
 
         btnReturnMenu.setOnClickListener(v -> {
-            logic.resetGame();
+            logic.returnToMenu();
             pauseMenu.setVisibility(View.GONE);
             mainMenu.setVisibility(View.VISIBLE);
         });
 
         btnRestartWin.setOnClickListener(v -> {
-            logic.restart();
+            logic.startGame();
             winMenu.setVisibility(View.GONE);
         });
 
         btnReturnMenuWin.setOnClickListener(v -> {
-            logic.resetGame();
+            logic.returnToMenu();
             winMenu.setVisibility(View.GONE);
             mainMenu.setVisibility(View.VISIBLE);
         });
@@ -99,8 +99,6 @@ public class MainActivity extends AppCompatActivity {
             tvWinTime.setText(String.format("You Won!\nTime: %.2fs", elapsed));
             tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
         }
-
-
     }
 
     @Override
@@ -108,17 +106,17 @@ public class MainActivity extends AppCompatActivity {
         if (logic == null) return super.onKeyDown(keyCode, event);
 
         if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
-            if (logic.isRunning()) {
-                logic.pause();
+            if (logic.isPlaying()) {
+                logic.pauseGame();
                 pauseMenu.setVisibility(View.VISIBLE);
-            } else if (!logic.isGameWon()) {
-                logic.resume();
+            } else if (logic.getGameState() == GameLogic.GameState.PAUSED) {
+                logic.resumeGame();
                 pauseMenu.setVisibility(View.GONE);
             }
             return true;
         }
 
-        if (!logic.isRunning()) return true;
+        if (!logic.isPlaying()) return true;
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -134,13 +132,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         gameView.onPause();
-        if (logic.isRunning()) logic.pause();
+        if (logic.isPlaying()) logic.pauseGame();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         gameView.onResume();
-        if (!logic.isRunning() && !mainMenu.isShown() && !pauseMenu.isShown() && !winMenu.isShown()) logic.resume();
     }
 }

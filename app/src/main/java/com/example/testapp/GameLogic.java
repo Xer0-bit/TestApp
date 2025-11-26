@@ -8,7 +8,11 @@ public class GameLogic {
     private static final int TOTAL_PLATFORMS = 6; // 5 platforms + 1 finish
     private static final float PLATFORM_Y = 1.0f;
     private static final float PLATFORM_Z_SPACING = 5f;
-    private static final long INPUT_DELAY_MS = 600; // delay between jumps in milliseconds
+    private static final long INPUT_DELAY_MS = 200; // delay between jumps in milliseconds
+
+    public enum GameState {
+        MENU, PLAYING, PAUSED, WON
+    }
 
     public PlatformGlass[] platforms;
     public Player player;
@@ -18,11 +22,10 @@ public class GameLogic {
     private Random random = new Random();
     private Handler handler = new Handler();
 
-    private boolean running = true;
-    private boolean gameWon = false;
-    private long startTime = System.currentTimeMillis();
-    private long pausedTime = 0;
-    private long winTime = 0;
+    private GameState state = GameState.MENU;
+    private long gameStartTime = 0;
+    private long pauseStartTime = 0;
+    private long totalPausedTime = 0;
     private double bestTime = Double.MAX_VALUE;
 
     // Screen shake
@@ -34,11 +37,10 @@ public class GameLogic {
 
     public GameLogic() {
         particles = new ParticleSystem();
-        running = false; // start paused
-        resetGame();
+        initializeGame();
     }
 
-    public void resetGame() {
+    private void initializeGame() {
         platforms = new PlatformGlass[TOTAL_PLATFORMS];
         float startZ = 0f;
 
@@ -51,23 +53,47 @@ public class GameLogic {
         platforms[TOTAL_PLATFORMS - 1] = new PlatformGlass(TOTAL_PLATFORMS - 1, true, PLATFORM_Y, startZ + (TOTAL_PLATFORMS - 1) * PLATFORM_Z_SPACING);
         platforms[TOTAL_PLATFORMS - 1].setIsFinish(true);
 
-        player = new Player(0f, PLATFORM_Y, -2f); // start behind first platform
+        player = new Player(0f, PLATFORM_Y, -2f);
         nextPlatform = 0;
-        startTime = System.currentTimeMillis();
-        pausedTime = 0;
-        winTime = 0;
-        running = true;
-        gameWon = false;
         shakeAmount = 0f;
         lastJumpTime = 0;
         particles = new ParticleSystem();
     }
 
+    public void startGame() {
+        if (state != GameState.MENU) return; // only start from menu
+
+        initializeGame();
+        gameStartTime = System.currentTimeMillis();
+        totalPausedTime = 0;
+        state = GameState.PLAYING;
+    }
+
+    public void pauseGame() {
+        if (state != GameState.PLAYING) return;
+        pauseStartTime = System.currentTimeMillis();
+        state = GameState.PAUSED;
+    }
+
+    public void resumeGame() {
+        if (state != GameState.PAUSED) return;
+        long pauseDuration = System.currentTimeMillis() - pauseStartTime;
+        totalPausedTime += pauseDuration;
+        state = GameState.PLAYING;
+    }
+
+    public void returnToMenu() {
+        state = GameState.MENU;
+        initializeGame();
+    }
+
     public void jumpLeft() {
+        if (state != GameState.PLAYING) return;
         handleJump(true);
     }
 
     public void jumpRight() {
+        if (state != GameState.PLAYING) return;
         handleJump(false);
     }
 
@@ -109,19 +135,17 @@ public class GameLogic {
 
             // make player fall and reset to start
             player.fall();
-            handler.postDelayed(() -> player.respawn(), 500);
-
-            // reset next platform index but keep platforms as they are
-            nextPlatform = 0;
-            lastJumpTime = 0; // allow immediate jump after respawn
+            handler.postDelayed(() -> {
+                player.respawn();
+                nextPlatform = 0;
+                lastJumpTime = System.currentTimeMillis() - INPUT_DELAY_MS; // allow immediate jump
+            }, 500);
         }
     }
 
     private void winGame() {
-        running = false;
-        gameWon = true;
-        winTime = System.currentTimeMillis();
-        double elapsed = (winTime - startTime) / 1000.0;
+        state = GameState.WON;
+        double elapsed = getElapsedSeconds();
         if (elapsed < bestTime) {
             bestTime = elapsed;
         }
@@ -133,7 +157,7 @@ public class GameLogic {
     }
 
     public void update() {
-        if (!running && !gameWon) return;
+        if (state != GameState.PLAYING) return;
 
         player.update();
 
@@ -158,36 +182,19 @@ public class GameLogic {
     }
 
     public double getElapsedSeconds() {
-        if (gameWon) {
-            return (winTime - startTime) / 1000.0;
+        if (state == GameState.MENU) {
+            return 0;
         }
-        return running ? (System.currentTimeMillis() - startTime) / 1000.0 : (pausedTime - startTime) / 1000.0;
+        if (state == GameState.WON || state == GameState.PAUSED) {
+            return (pauseStartTime - gameStartTime - totalPausedTime) / 1000.0;
+        }
+        // PLAYING state
+        return (System.currentTimeMillis() - gameStartTime - totalPausedTime) / 1000.0;
     }
 
-    public boolean isRunning() { return running; }
-
-    public boolean isGameWon() { return gameWon; }
-
+    public GameState getGameState() { return state; }
+    public boolean isPlaying() { return state == GameState.PLAYING; }
+    public boolean isGameWon() { return state == GameState.WON; }
     public double getBestTime() { return bestTime; }
-
-    public void start() { resetGame(); }
-
-    public void pause() {
-        if (running) {
-            pausedTime = System.currentTimeMillis();
-            running = false;
-        }
-    }
-
-    public void resume() {
-        if (!running && !gameWon) {
-            long now = System.currentTimeMillis();
-            startTime += (now - pausedTime);
-            running = true;
-        }
-    }
-
-    public void restart() { resetGame(); }
-
     public int getNextPlatformIndex() { return nextPlatform; }
 }

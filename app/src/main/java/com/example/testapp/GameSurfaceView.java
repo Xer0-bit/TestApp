@@ -27,7 +27,16 @@ public class GameSurfaceView extends GLSurfaceView {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         GameLogic logic = renderer.getLogic();
-        if (!logic.isRunning() && keyCode != KeyEvent.KEYCODE_ESCAPE) return true;
+
+        // Only allow escape to work in any state, other keys only work during gameplay
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            return true; // let MainActivity handle it
+        }
+
+        // Block all other input if not playing
+        if (!logic.isPlaying()) {
+            return true; // consume input but don't use it
+        }
 
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -36,10 +45,6 @@ public class GameSurfaceView extends GLSurfaceView {
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_D:
                 logic.jumpLeft(); return true;
-            case KeyEvent.KEYCODE_ESCAPE:
-                if (logic.isRunning()) logic.pause();
-                else logic.resume();
-                return true;
             default: return super.onKeyDown(keyCode, event);
         }
     }
@@ -47,10 +52,18 @@ public class GameSurfaceView extends GLSurfaceView {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
+
+        GameLogic logic = renderer.getLogic();
+
+        // Only process touch input during gameplay
+        if (!logic.isPlaying()) {
+            return true; // consume but ignore
+        }
+
         float x = event.getX();
         float w = getWidth();
-        if (x < w / 2f) renderer.getLogic().jumpRight();
-        else renderer.getLogic().jumpLeft();
+        if (x < w / 2f) logic.jumpRight();
+        else logic.jumpLeft();
         return true;
     }
 }

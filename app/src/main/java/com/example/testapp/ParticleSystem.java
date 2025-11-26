@@ -2,30 +2,12 @@ package com.example.testapp;
 
 import android.opengl.GLES20;
 import android.opengl.Matrix;
-import android.os.SystemClock;
-import android.util.Log;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
-import java.util.Random;
 
 public class ParticleSystem {
-
-    private static final float GRAVITY = 0.02f;
-    private static final float PARTICLE_LIFETIME_STEP = 0.016f; // ~60fps
-    private static final int COORDS_PER_VERTEX = 3;
-
-    // Particle counts
-    private static final int BREAK_PARTICLE_COUNT = 12;
-    private static final int LAND_PARTICLE_COUNT = 8;
-
-    // Colors
-    private static final float[] BREAK_COLOR = {0.4f, 0.8f, 1f, 0.8f}; // Blue glass
-    private static final float[] LAND_COLOR = {1f, 0.8f, 0.1f, 0.7f}; // Gold
-    private final Object particleLock = new Object();
-
 
     private static class Particle {
         float x, y, z;
@@ -34,8 +16,7 @@ public class ParticleSystem {
         float[] color;
         float size;
 
-        Particle(float x, float y, float z, float vx, float vy, float vz,
-                 float life, float[] color, float size) {
+        Particle(float x, float y, float z, float vx, float vy, float vz, float life, float[] color, float size) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -52,109 +33,76 @@ public class ParticleSystem {
             x += vx;
             y += vy;
             z += vz;
-            vy -= GRAVITY;
-            life -= PARTICLE_LIFETIME_STEP;
+            vy -= 0.02f; // gravity
+            life -= 0.016f; // ~60fps
         }
 
         boolean isAlive() {
             return life > 0;
         }
-
-        float getAlpha() {
-            return life / maxLife;
-        }
     }
 
     private ArrayList<Particle> particles = new ArrayList<>();
-    private Random random = new Random();
     private float[] modelMatrix = new float[16];
     private float[] mvpMatrix = new float[16];
 
-    // Simple cube for particles (more efficient than spheres)
-    private static final float PARTICLE_SIZE = 0.1f;
-    private static final float[] CUBE_VERTICES = {
-            // Front face
-            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            // Back face
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            // Top face
-            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            // Bottom face
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            // Right face
-            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE,
-            PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            // Left face
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE, -PARTICLE_SIZE, -PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE,  PARTICLE_SIZE,
-            -PARTICLE_SIZE,  PARTICLE_SIZE, -PARTICLE_SIZE
-    };
-
-    private static FloatBuffer particleBuffer;
+    private static final float[] SPHERE_VERTICES = generateSphere(0.1f, 6, 6);
+    private static FloatBuffer sphereBuffer;
 
     static {
-        ByteBuffer bb = ByteBuffer.allocateDirect(CUBE_VERTICES.length * 4);
+        ByteBuffer bb = ByteBuffer.allocateDirect(SPHERE_VERTICES.length * 4);
         bb.order(ByteOrder.nativeOrder());
-        particleBuffer = bb.asFloatBuffer();
-        particleBuffer.put(CUBE_VERTICES);
-        particleBuffer.position(0);
+        sphereBuffer = bb.asFloatBuffer();
+        sphereBuffer.put(SPHERE_VERTICES);
+        sphereBuffer.position(0);
+    }
+
+    private static float[] generateSphere(float radius, int lats, int lons) {
+        ArrayList<Float> vertices = new ArrayList<>();
+        for (int i = 0; i <= lats; i++) {
+            float lat = (float) (Math.PI * i / lats);
+            float sinLat = (float) Math.sin(lat);
+            float cosLat = (float) Math.cos(lat);
+
+            for (int j = 0; j <= lons; j++) {
+                float lon = (float) (2 * Math.PI * j / lons);
+                float sinLon = (float) Math.sin(lon);
+                float cosLon = (float) Math.cos(lon);
+
+                vertices.add(radius * sinLat * cosLon);
+                vertices.add(radius * cosLat);
+                vertices.add(radius * sinLat * sinLon);
+            }
+        }
+
+        float[] result = new float[vertices.size()];
+        for (int i = 0; i < vertices.size(); i++) {
+            result[i] = vertices.get(i);
+        }
+        return result;
     }
 
     public void spawnBreakEffect(float x, float y, float z) {
-        Log.d("DBG_PARTICLES",
-                "spawnBreakEffect at " + SystemClock.uptimeMillis() +
-                        "  thread=" + Thread.currentThread().getName() +
-                        "  sizeBefore=" + particles.size()
-        );
-        synchronized (particleLock) {
-            for (int i = 0; i < BREAK_PARTICLE_COUNT; i++) {
-                float angle = random.nextFloat() * (float) Math.PI * 2;
-                float speed = random.nextFloat() * 0.15f + 0.05f;
-                float vx = (float) Math.cos(angle) * speed;
-                float vz = (float) Math.sin(angle) * speed;
-                float vy = random.nextFloat() * 0.1f + 0.05f;
-                particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, BREAK_COLOR, 0.08f));
-            }
+        float[] color = {0.4f, 0.8f, 1f, 0.8f};
+        for (int i = 0; i < 12; i++) {
+            float angle = (float) (Math.random() * Math.PI * 2);
+            float speed = (float) (Math.random() * 0.15f + 0.05f);
+            float vx = (float) Math.cos(angle) * speed;
+            float vz = (float) Math.sin(angle) * speed;
+            float vy = (float) (Math.random() * 0.1f + 0.05f);
+            particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, color, 0.08f));
         }
     }
 
     public void spawnLandEffect(float x, float y, float z) {
-        synchronized (particleLock) {
-            for (int i = 0; i < LAND_PARTICLE_COUNT; i++) {
-                float angle = random.nextFloat() * (float) Math.PI * 2;
-                float speed = random.nextFloat() * 0.1f + 0.03f;
-                float vx = (float) Math.cos(angle) * speed;
-                float vz = (float) Math.sin(angle) * speed;
-                float vy = random.nextFloat() * 0.05f + 0.02f;
-                particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, LAND_COLOR, 0.06f));
-            }
+        float[] color = {1f, 0.8f, 0.1f, 0.7f};
+        for (int i = 0; i < 8; i++) {
+            float angle = (float) (Math.random() * Math.PI * 2);
+            float speed = (float) (Math.random() * 0.1f + 0.03f);
+            float vx = (float) Math.cos(angle) * speed;
+            float vz = (float) Math.sin(angle) * speed;
+            float vy = (float) (Math.random() * 0.05f + 0.02f);
+            particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, color, 0.06f));
         }
     }
 
@@ -163,44 +111,37 @@ public class ParticleSystem {
     }
 
     public void update() {
-        synchronized (particleLock) {
-            for (int i = particles.size() - 1; i >= 0; i--) {
-                Particle p = particles.get(i);
-                p.update();
-                if (!p.isAlive()) {
-                    particles.remove(i);
-                }
+        for (int i = particles.size() - 1; i >= 0; i--) {
+            Particle p = particles.get(i);
+            p.update();
+            if (!p.isAlive()) {
+                particles.remove(i);
             }
         }
     }
 
     public void draw(float[] vpMatrix) {
-        if (ShaderHelper.program == -1) return;
+        if (particles.isEmpty() || ShaderHelper.program == -1) return;
 
-        synchronized (particleLock) {
-            if (particles.isEmpty()) return;
+        GLES20.glUseProgram(ShaderHelper.program);
 
-            GLES20.glUseProgram(ShaderHelper.program);
+        for (Particle p : particles) {
+            Matrix.setIdentityM(modelMatrix, 0);
+            Matrix.translateM(modelMatrix, 0, p.x, p.y, p.z);
+            Matrix.scaleM(modelMatrix, 0, p.size, p.size, p.size);
+            Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
 
-            for (Particle p : particles) {
-                Matrix.setIdentityM(modelMatrix, 0);
-                Matrix.translateM(modelMatrix, 0, p.x, p.y, p.z);
-                Matrix.scaleM(modelMatrix, 0, p.size, p.size, p.size);
-                Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+            float[] color = p.color.clone();
+            color[3] *= (p.life / p.maxLife); // fade out
 
-                float[] color = p.color.clone();
-                color[3] *= p.getAlpha();
+            GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+            GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
 
-                GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
-                GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
-
-                particleBuffer.position(0);
-                GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
-                GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
-                        GLES20.GL_FLOAT, false, 0, particleBuffer);
-                GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, CUBE_VERTICES.length / COORDS_PER_VERTEX);
-                GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
-            }
+            sphereBuffer.position(0);
+            GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3, GLES20.GL_FLOAT, false, 0, sphereBuffer);
+            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, SPHERE_VERTICES.length / 3);
+            GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
         }
     }
 }

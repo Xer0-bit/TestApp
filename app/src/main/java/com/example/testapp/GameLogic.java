@@ -9,22 +9,14 @@ import java.util.Random;
 
 public class GameLogic {
 
-    // Constants
     private static final int TOTAL_PLATFORMS = 6;
     private static final float PLATFORM_Y = 1.0f;
     private static final float PLATFORM_Z_SPACING = 5f;
     private static final long INPUT_DELAY_MS = 200;
-    private static final float GRAVITY = 0.02f;
-    private static final float FALL_SPEED = 0.05f;
-    private static final float JUMP_LAND_SHAKE = 0.15f;
-    private static final float GLASS_BREAK_SHAKE = 0.25f;
     private static final float SHAKE_DECAY_RATE = 3.0f;
-    private static final long RESPAWN_DELAY_MS = 200;
-    private static final long POST_RESPAWN_COOLDOWN_MS = 250;
+    private static final long RESPAWN_DELAY_MS = 1000;
     private static final long LAND_EFFECT_DELAY_MS = 300;
     private static final float MAX_DELTA_TIME = 0.05f;
-    private boolean hasStartedTimer = false;
-
 
     public enum GameState {
         MENU, PLAYING, PAUSED, WON
@@ -49,9 +41,14 @@ public class GameLogic {
     private long lastJumpTime = 0;
     private long lastFrameTime = 0;
     private boolean isRespawning = false;
-
-    // Track if handler is active to prevent memory leaks
+    private boolean hasStartedTimer = false;
     private volatile boolean isActive = true;
+
+    // Deferred effects - simple queue for land/break effects
+    private long landEffectTime = 0;
+    private float landEffectX, landEffectY, landEffectZ;
+    private long breakEffectTime = 0;
+    private long respawnTime = 0;
 
     public GameLogic() {
         handler = new Handler(Looper.getMainLooper());
@@ -85,28 +82,22 @@ public class GameLogic {
         lastFrameTime = SystemClock.uptimeMillis();
         isRespawning = false;
         hasStartedTimer = false;
+        landEffectTime = 0;
+        breakEffectTime = 0;
+        respawnTime = 0;
 
         if (particles == null) {
             particles = new ParticleSystem();
         } else {
             particles.clear();
         }
-
-        // Clear any previously scheduled events
-        synchronized (scheduledLock) {
-            scheduledEvents.clear();
-        }
     }
 
     public void startGame() {
         initializeGame();
-        // REMOVE THIS:
-        // gameStartTime = SystemClock.uptimeMillis();
-
         state = GameState.PLAYING;
         totalPausedTime = 0;
         winTime = 0;
-
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
     }
@@ -118,7 +109,6 @@ public class GameLogic {
         winTime = 0;
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
-        // Set lastJumpTime to past to allow immediate first jump
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
     }
 
@@ -143,51 +133,13 @@ public class GameLogic {
         winTime = 0;
     }
 
-    // --- add these fields ---
-    private static class ScheduledEvent {
-        long executeAt;
-        Runnable action;
-        ScheduledEvent(long executeAt, Runnable action) {
-            this.executeAt = executeAt;
-            this.action = action;
-        }
-    }
-
-    private final java.util.ArrayList<ScheduledEvent> scheduledEvents = new java.util.ArrayList<>();
-    private final Object scheduledLock = new Object();
-// --- end added fields ---
-
-    /**
-     * Schedule a Runnable to run on the GL/update thread after `delayMs`.
-     * update() will execute scheduled actions when their time arrives.
-     */
-    private void scheduleOnGLThread(Runnable action, long delayMs) {
-        long runAt = SystemClock.uptimeMillis() + Math.max(0, delayMs);
-        synchronized (scheduledLock) {
-            scheduledEvents.add(new ScheduledEvent(runAt, action));
-        }
-    }
-
     public void jumpLeft() {
-        Log.d("DBG_JUMP",
-                "jumpLeft at " + SystemClock.uptimeMillis() +
-                        "  thread=" + Thread.currentThread().getName()
-        );
-
         handleJump(true);
     }
 
-
     public void jumpRight() {
-        Log.d("DBG_JUMP",
-                "jumpRight at " + SystemClock.uptimeMillis() +
-                        "  thread=" + Thread.currentThread().getName()
-        );
-
         handleJump(false);
     }
-
-
 
     private void handleJump(boolean left) {
         if (!isActive || platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
@@ -216,42 +168,29 @@ public class GameLogic {
             player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
             nextPlatform++;
 
-            // Schedule land effect and shake on the GL thread (do NOT post to main thread)
-            scheduleOnGLThread(() -> {
-                if (isActive && player != null && particles != null && state == GameState.PLAYING) {
-                    particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
-                    shakeAmount = JUMP_LAND_SHAKE;
-                }
-            }, LAND_EFFECT_DELAY_MS);
+            // Schedule land effect to run in update() instead of on main thread
+            landEffectTime = currentTime + LAND_EFFECT_DELAY_MS;
+            landEffectX = player.x;
+            landEffectY = PLATFORM_Y;
+            landEffectZ = player.z;
 
             if (nextPlatform >= TOTAL_PLATFORMS) {
-                // schedule win on GL thread immediately to keep ordering consistent
-                scheduleOnGLThread(this::winGame, 0);
+                winGame();
             }
         } else {
             p.breakSide(left);
 
-            // Spawn break effect immediately on GL thread
+            // Spawn break effect immediately (no threading)
             if (particles != null) {
                 particles.spawnBreakEffect(p.getX(left), p.getY(), p.getZ());
             }
 
-            shakeAmount = GLASS_BREAK_SHAKE;
+            shakeAmount = 0.25f;
 
             if (player != null) {
                 player.fall();
                 isRespawning = true;
-
-                // Schedule respawn to run on GL thread after RESPAWN_DELAY_MS
-                scheduleOnGLThread(() -> {
-                    if (isActive && player != null && state == GameState.PLAYING) {
-                        player.respawn();
-                        nextPlatform = 0;
-                        isRespawning = false;
-                        // Set lastJumpTime to past to allow immediate jump after respawn
-                        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
-                    }
-                }, RESPAWN_DELAY_MS);
+                respawnTime = currentTime + RESPAWN_DELAY_MS;
             }
         }
     }
@@ -284,19 +223,24 @@ public class GameLogic {
 
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
-        // Execute any scheduled events whose time has arrived (run on GL thread)
-        synchronized (scheduledLock) {
-            for (int i = scheduledEvents.size() - 1; i >= 0; i--) {
-                ScheduledEvent ev = scheduledEvents.get(i);
-                if (ev.executeAt <= currentTime) {
-                    try {
-                        ev.action.run();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                    }
-                    scheduledEvents.remove(i);
-                }
+        // Process deferred land effect
+        if (landEffectTime > 0 && currentTime >= landEffectTime) {
+            if (particles != null) {
+                particles.spawnLandEffect(landEffectX, landEffectY, landEffectZ);
             }
+            shakeAmount = 0.15f;
+            landEffectTime = 0;
+        }
+
+        // Process deferred respawn
+        if (isRespawning && respawnTime > 0 && currentTime >= respawnTime) {
+            if (player != null && state == GameState.PLAYING) {
+                player.respawn();
+                nextPlatform = 0;
+                isRespawning = false;
+                lastJumpTime = currentTime - INPUT_DELAY_MS;
+            }
+            respawnTime = 0;
         }
 
         player.update();
@@ -357,10 +301,6 @@ public class GameLogic {
 
     public void cleanup() {
         isActive = false;
-        // clear scheduled events
-        synchronized (scheduledLock) {
-            scheduledEvents.clear();
-        }
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }

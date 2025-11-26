@@ -2,23 +2,29 @@ package com.example.testapp;
 
 public class Player {
 
-    public float x = 0;
-    public float y = 1.0f;
-    public float z = 0f;
+    public float x, y, z;
 
     private float jumpSpeed = 0.2f;
     private float targetX, targetY, targetZ;
     private boolean jumping = false;
     private boolean falling = false;
 
-    // --- Getters ---
+    public Player(float startX, float startY, float startZ) {
+        x = startX;
+        y = startY;
+        z = startZ;
+        targetX = x;
+        targetY = y;
+        targetZ = z;
+    }
+
     public boolean isJumping() { return jumping; }
     public boolean isFalling() { return falling; }
 
-    public void jumpTo(float targetX, float targetY, float targetZ) {
-        this.targetX = targetX;
-        this.targetY = targetY;
-        this.targetZ = targetZ;
+    public void jumpTo(float tX, float tY, float tZ) {
+        targetX = tX;
+        targetY = tY;
+        targetZ = tZ;
         jumping = true;
         falling = false;
     }
@@ -28,11 +34,18 @@ public class Player {
         falling = true;
     }
 
+    public void respawn() {
+        // Respawn back at player level without ending game
+        jumping = false;
+        falling = false;
+        y = targetY; // reset to platform Y
+    }
+
     public void update() {
         if (jumping) {
             float dx = targetX - x;
-            float dy = targetY - y;
             float dz = targetZ - z;
+            float dy = targetY - y;
             if (Math.abs(dx) < 0.01f && Math.abs(dy) < 0.01f && Math.abs(dz) < 0.01f) {
                 x = targetX;
                 y = targetY;
@@ -44,13 +57,20 @@ public class Player {
                 z += dz * jumpSpeed;
             }
         }
-        if (falling) y -= 0.2f;
+
+        if (falling) {
+            y -= 0.3f;
+            if (y < -2f) {
+                respawn();
+            }
+        }
     }
 
     public void draw(float[] vpMatrix) {
         float[] color = {1f, 0.8f, 0.1f, 1f};
         Cube c = new Cube(x, y, z);
         c.size = 0.4f;
+        c.modelRotationX = 0;
         c.draw(vpMatrix, color);
     }
 }

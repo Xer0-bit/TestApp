@@ -46,15 +46,19 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     public void onDrawFrame(GL10 gl) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-        // update camera to follow player
+        // update camera to follow player in third person
         Player player = logic.player;
-        float camX = player.x;
-        float camY = player.y + 5f;
-        float camZ = player.z + 10f;
 
+        float camDistance = 6f;       // behind player
+        float camHeight = 3f;         // above player
+        float camX = player.x;
+        float camY = player.y + camHeight;
+        float camZ = player.z + camDistance;
+
+        // Look at player position
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,
-                camX, player.y, player.z,
+                player.x, player.y, player.z,
                 0f, 1f, 0f);
 
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);

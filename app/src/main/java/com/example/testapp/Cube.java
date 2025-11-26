@@ -88,6 +88,7 @@ public class Cube {
         GLES20.glUseProgram(ShaderHelper.program);
 
         // model matrix
+        // Already handled by setting modelRotationX = 0 for platforms
         Matrix.setIdentityM(modelMatrix, 0);
         Matrix.translateM(modelMatrix, 0, x, y, z);
         Matrix.rotateM(modelMatrix, 0, modelRotationX, 1f, 0f, 0f);

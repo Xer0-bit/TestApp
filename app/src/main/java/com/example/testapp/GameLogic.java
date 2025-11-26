@@ -5,38 +5,37 @@ import android.os.Handler;
 
 public class GameLogic {
 
-    private static final int TOTAL_JUMPS = 5;
+    private static final int TOTAL_PLATFORMS = 5;
+    private static final float PLATFORM_Y = 1.0f;
+    private static final float PLATFORM_Z_SPACING = 5f; // distance between platforms
 
     public PlatformGlass[] platforms;
     public Player player;
 
-    private int currentJump = 0;
+    private int nextPlatform = 0;
     private Random random = new Random();
-
-    private long startTime;
-    private long pausedTime;
-    private boolean running = false;
-
-    public long bestTime = Long.MAX_VALUE;
-
     private Handler handler = new Handler();
+
+    private boolean running = true; // always running
+    private long startTime = System.currentTimeMillis();
+    private long pausedTime = 0;
 
     public GameLogic() {
         resetGame();
     }
 
     public void resetGame() {
-        platforms = new PlatformGlass[TOTAL_JUMPS];
-        for (int i = 0; i < TOTAL_JUMPS; i++) {
-            boolean correctIsLeft = random.nextBoolean();
-            platforms[i] = new PlatformGlass(i, correctIsLeft);
+        platforms = new PlatformGlass[TOTAL_PLATFORMS];
+        float startZ = -PLATFORM_Z_SPACING; // first platform in front of player
+        for (int i = 0; i < TOTAL_PLATFORMS; i++) {
+            boolean leftIsCorrect = random.nextBoolean();
+            platforms[i] = new PlatformGlass(i, leftIsCorrect, PLATFORM_Y, startZ - i * PLATFORM_Z_SPACING);
         }
 
-        player = new Player();
-        currentJump = 0;
-
+        player = new Player(0f, PLATFORM_Y, 2f); // start slightly in front
+        nextPlatform = 0;
         startTime = System.currentTimeMillis();
-        running = false;
+        running = true;
     }
 
     public void jumpLeft() {
@@ -48,43 +47,43 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
-        if (!running) return;
-        if (currentJump >= TOTAL_JUMPS) return;
+        if (nextPlatform >= TOTAL_PLATFORMS) return;
 
-        PlatformGlass p = platforms[currentJump];
+        PlatformGlass p = platforms[nextPlatform];
 
         if (p.isCorrect(left)) {
-            player.jumpTo(p.getX(left), p.getY(), p.getZ());
-            currentJump++;
-
-            if (currentJump == TOTAL_JUMPS) {
-                long finish = System.currentTimeMillis() - startTime;
-                if (finish < bestTime) bestTime = finish;
-                running = false;
-            }
-
+            player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
+            nextPlatform++;
         } else {
             player.fall();
-            p.breakSide(left);
-
-            // Reset after fall
-            handler.postDelayed(this::resetGame, 1000);
+            // respawn player without restarting game
+            handler.postDelayed(() -> player.respawn(), 500);
         }
     }
 
     public void update() {
         player.update();
 
-        // Update platforms animations
         for (PlatformGlass p : platforms) {
             p.update();
         }
 
-        // Reset player if he fell below visible
-        if (!player.isJumping() && !player.isFalling()) return;
-        if (player.y < -4f) {
-            handler.postDelayed(this::resetGame, 1000);
+        // recycle platforms endlessly
+        for (int i = 0; i < TOTAL_PLATFORMS; i++) {
+            if (platforms[i].getZ() > player.z + 10f) { // behind player
+                boolean leftIsCorrect = random.nextBoolean();
+                float newZ = getFarthestPlatformZ() - PLATFORM_Z_SPACING;
+                platforms[i] = new PlatformGlass(i, leftIsCorrect, PLATFORM_Y, newZ);
+            }
         }
+    }
+
+    private float getFarthestPlatformZ() {
+        float minZ = Float.MAX_VALUE;
+        for (PlatformGlass p : platforms) {
+            if (p.getZ() < minZ) minZ = p.getZ();
+        }
+        return minZ;
     }
 
     public void draw(float[] vpMatrix) {
@@ -94,11 +93,22 @@ public class GameLogic {
         player.draw(vpMatrix);
     }
 
-    // --- Controls for MainActivity ---
+    // --- Timer / survival methods for MainActivity ---
+    public double getElapsedSeconds() {
+        if (running) return (System.currentTimeMillis() - startTime) / 1000.0;
+        else return (pausedTime - startTime) / 1000.0;
+    }
+
+    public long getBestTimeMs() {
+        return Long.MAX_VALUE; // not used
+    }
+
+    public boolean isRunning() {
+        return running;
+    }
+
     public void start() {
         resetGame();
-        running = true;
-        startTime = System.currentTimeMillis();
     }
 
     public void pause() {
@@ -111,26 +121,12 @@ public class GameLogic {
     public void resume() {
         if (!running) {
             long now = System.currentTimeMillis();
-            startTime += (now - pausedTime);
+            startTime += (now - pausedTime); // adjust timer
             running = true;
         }
     }
 
     public void restart() {
         resetGame();
-        running = true;
-    }
-
-    public boolean isRunning() {
-        return running;
-    }
-
-    public double getElapsedSeconds() {
-        if (running) return (System.currentTimeMillis() - startTime) / 1000.0;
-        else return (pausedTime - startTime) / 1000.0;
-    }
-
-    public long getBestTimeMs() {
-        return bestTime;
     }
 }

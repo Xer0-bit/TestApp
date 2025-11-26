@@ -5,6 +5,7 @@ public class PlatformGlass {
     private float y, z;
     private int index;
     private boolean leftIsCorrect;
+    private boolean isFinish = false;
 
     private boolean leftBroken = false;
     private boolean rightBroken = false;
@@ -22,7 +23,13 @@ public class PlatformGlass {
         this.z = z;
     }
 
-    public boolean isCorrect(boolean left) { return left == leftIsCorrect; }
+    public void setIsFinish(boolean finish) {
+        this.isFinish = finish;
+    }
+
+    public boolean isCorrect(boolean left) { return left == leftIsCorrect || isFinish; }
+
+    public boolean isFinish() { return isFinish; }
 
     public float getX(boolean left) { return left ? xLeft : xRight; }
     public float getY() { return y; }
@@ -39,7 +46,7 @@ public class PlatformGlass {
     }
 
     public void draw(float[] vpMatrix) {
-        float[] glassColor = {0.4f, 0.8f, 1f, 0.45f};
+        float[] glassColor = isFinish ? new float[]{0.2f, 1f, 0.3f, 0.45f} : new float[]{0.4f, 0.8f, 1f, 0.45f};
 
         if (!leftBroken || breakProgressLeft < 1f) {
             Cube c = new Cube(xLeft, y - breakProgressLeft * 3f, z);

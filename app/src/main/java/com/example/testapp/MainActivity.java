@@ -17,8 +17,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvTimer;
     private Runnable tickRunnable;
 
-    private LinearLayout mainMenu, pauseMenu;
-    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu;
+    private LinearLayout mainMenu, pauseMenu, winMenu;
+    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu, btnRestartWin, btnReturnMenuWin;
     private GameLogic logic;
 
     @Override
@@ -31,11 +31,14 @@ public class MainActivity extends AppCompatActivity {
 
         mainMenu = findViewById(R.id.mainMenu);
         pauseMenu = findViewById(R.id.pauseMenu);
+        winMenu = findViewById(R.id.winMenu);
 
         btnStartGame = findViewById(R.id.btnStartGame);
         btnResume = findViewById(R.id.btnResume);
         btnRestartPause = findViewById(R.id.btnRestartPause);
         btnReturnMenu = findViewById(R.id.btnReturnMenu);
+        btnRestartWin = findViewById(R.id.btnRestartWin);
+        btnReturnMenuWin = findViewById(R.id.btnReturnMenuWin);
 
         logic = gameView.getRenderer().getLogic();
 
@@ -60,6 +63,17 @@ public class MainActivity extends AppCompatActivity {
             mainMenu.setVisibility(View.VISIBLE);
         });
 
+        btnRestartWin.setOnClickListener(v -> {
+            logic.restart();
+            winMenu.setVisibility(View.GONE);
+        });
+
+        btnReturnMenuWin.setOnClickListener(v -> {
+            logic.resetGame();
+            winMenu.setVisibility(View.GONE);
+            mainMenu.setVisibility(View.VISIBLE);
+        });
+
         tickRunnable = new Runnable() {
             @Override
             public void run() {
@@ -72,8 +86,21 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateTimerUI() {
         if (logic == null) return;
+
         double elapsed = logic.getElapsedSeconds();
-        tvTimer.setText(String.format("Time Survived: %.2fs", elapsed));
+        tvTimer.setText(String.format("Time: %.2fs", elapsed));
+
+        // Check if game was won
+        if (logic.isGameWon() && winMenu.getVisibility() != View.VISIBLE) {
+            winMenu.setVisibility(View.VISIBLE);
+            double bestTime = logic.getBestTime();
+            TextView tvWinTime = findViewById(R.id.tvWinTime);
+            TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
+            tvWinTime.setText(String.format("You Won!\nTime: %.2fs", elapsed));
+            tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
+        }
+
+
     }
 
     @Override
@@ -84,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
             if (logic.isRunning()) {
                 logic.pause();
                 pauseMenu.setVisibility(View.VISIBLE);
-            } else {
+            } else if (!logic.isGameWon()) {
                 logic.resume();
                 pauseMenu.setVisibility(View.GONE);
             }
@@ -114,6 +141,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         gameView.onResume();
-        if (!logic.isRunning() && !mainMenu.isShown() && !pauseMenu.isShown()) logic.resume();
+        if (!logic.isRunning() && !mainMenu.isShown() && !pauseMenu.isShown() && !winMenu.isShown()) logic.resume();
     }
 }

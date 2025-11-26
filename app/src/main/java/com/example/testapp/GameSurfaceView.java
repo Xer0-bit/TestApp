@@ -32,10 +32,10 @@ public class GameSurfaceView extends GLSurfaceView {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_A:
-                logic.jumpLeft(); return true;
+                logic.jumpRight(); return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_D:
-                logic.jumpRight(); return true;
+                logic.jumpLeft(); return true;
             case KeyEvent.KEYCODE_ESCAPE:
                 if (logic.isRunning()) logic.pause();
                 else logic.resume();
@@ -49,8 +49,8 @@ public class GameSurfaceView extends GLSurfaceView {
         if (event.getAction() != MotionEvent.ACTION_DOWN) return true;
         float x = event.getX();
         float w = getWidth();
-        if (x < w / 2f) renderer.getLogic().jumpLeft();
-        else renderer.getLogic().jumpRight();
+        if (x < w / 2f) renderer.getLogic().jumpRight();
+        else renderer.getLogic().jumpLeft();
         return true;
     }
 }

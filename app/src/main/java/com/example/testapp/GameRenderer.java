@@ -49,18 +49,19 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         Player player = logic.player;
 
-        // Camera offset values
-        float camHeight = 3f;   // Y offset above player
-        float camDistance = 6f; // distance along Z from player
-        boolean cameraInFront = true; // true = camera in front of player
+        // Camera positioned above and behind, looking down the platforms
+        float camHeight = 4f;   // Y offset above the platforms
+        float camDistance = 8f; // distance behind the player along Z
 
-        float camX = 0f; // fixed, no side movement
+        // Camera stays centered between the left and right platforms (X = 0)
+        float camX = 0f;
         float camY = player.y + camHeight;
-        float camZ = cameraInFront ? player.z - camDistance : player.z + camDistance;
+        float camZ = player.z - camDistance;
 
-        float lookX = 0f; // always look at player's X
-        float lookY = player.y; // look at player's Y
-        float lookZ = player.z; // look at player's Z
+        // Look at point: centered between platforms, slightly ahead of player
+        float lookX = 0f;
+        float lookY = player.y;
+        float lookZ = player.z + 5f; // look ahead at upcoming platforms
 
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,

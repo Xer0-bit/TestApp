@@ -26,7 +26,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         // background black
-        GLES20.glClearColor(0f, 0f, 0f, 1f);
+        GLES20.glClearColor(0.6f, 0.7f, 0.9f, 1f);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
 
         // enable blending for glass transparency
@@ -66,8 +66,8 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         // view: camera positioned slightly behind and above, looking toward origin
         Matrix.setLookAtM(viewMatrix, 0,
-                0f, 3f, 6f,   // eyeX, eyeY, eyeZ
-                0f, 1f, 0f,   // centerX, centerY, centerZ
+                0f, -3.0f, 6f,   // eyeX, eyeY, eyeZ
+                0f, 0f, 0f,   // centerX, centerY, centerZ
                 0f, 1f, 0f);  // upX, upY, upZ
 
         // vp = projection * view

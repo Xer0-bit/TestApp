@@ -21,8 +21,8 @@ public class PlatformGlass {
         leftIsCorrect = correctLeft;
 
         float y = getY();
-        leftCube = new Cube(-1.5f, y, -5f);
-        rightCube = new Cube(1.5f, y, -5f);
+        leftCube = new Cube(-1.5f, y, -12f);
+        rightCube = new Cube(1.5f, y, -12f);
         leftCube.size = 1.5f;
         rightCube.size = 1.5f;
     }
@@ -36,7 +36,7 @@ public class PlatformGlass {
     }
 
     public float getY() {
-        return index * 1.8f + 0.5f;
+        return index * 1.3f + 1.0f;
     }
 
     public void draw(float[] vpMatrix) {

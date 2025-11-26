@@ -47,16 +47,20 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         // Update game logic
         logic.update();
 
-        // Camera follows player
         Player player = logic.player;
 
-        float camX = player.x;
-        float camY = player.y + 3f;   // above player
-        float camZ = player.z + 6f;   // behind player
+        // Camera offset values
+        float camHeight = 3f;   // Y offset above player
+        float camDistance = 6f; // distance along Z from player
+        boolean cameraInFront = true; // true = camera in front of player
 
-        float lookX = player.x;
-        float lookY = player.y;
-        float lookZ = player.z;
+        float camX = 0f; // fixed, no side movement
+        float camY = player.y + camHeight;
+        float camZ = cameraInFront ? player.z - camDistance : player.z + camDistance;
+
+        float lookX = 0f; // always look at player's X
+        float lookY = player.y; // look at player's Y
+        float lookZ = player.z; // look at player's Z
 
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,
@@ -65,6 +69,8 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
         Matrix.multiplyMM(vpMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
 
+        // Draw everything
         logic.draw(vpMatrix);
     }
+
 }

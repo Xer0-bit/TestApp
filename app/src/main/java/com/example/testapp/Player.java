@@ -4,15 +4,23 @@ public class Player {
 
     public float x, y, z;
 
-    private float jumpSpeed = 0.15f;  // movement interpolation
+    private float jumpSpeed = 0.15f;
     private float targetX, targetY, targetZ;
     private boolean jumping = false;
     private boolean falling = false;
 
+    // Save start position to reset after wrong step
+    private final float startX, startY, startZ;
+
     public Player(float startX, float startY, float startZ) {
+        this.startX = startX;
+        this.startY = startY;
+        this.startZ = startZ;
+
         x = startX;
         y = startY;
         z = startZ;
+
         targetX = x;
         targetY = y;
         targetZ = z;
@@ -35,12 +43,17 @@ public class Player {
     }
 
     public void respawn() {
-        // back to last safe platform
         jumping = false;
         falling = false;
-        x = targetX;
-        y = targetY;
-        z = targetZ - 0.5f; // slightly behind
+
+        // reset to start
+        x = startX;
+        y = startY;
+        z = startZ;
+
+        targetX = x;
+        targetY = y;
+        targetZ = z;
     }
 
     public void update() {

@@ -56,10 +56,18 @@ public class GameLogic {
             player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
             nextPlatform++;
         } else {
+            // mark the broken side
+            p.breakSide(left);
+
+            // make player fall and reset to start
             player.fall();
             handler.postDelayed(() -> player.respawn(), 500);
+
+            // reset next platform index
+            nextPlatform = 0;
         }
     }
+
 
     public void update() {
         player.update();

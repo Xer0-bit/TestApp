@@ -22,6 +22,8 @@ public class GameLogic {
     private static final long POST_RESPAWN_COOLDOWN_MS = 250;
     private static final long LAND_EFFECT_DELAY_MS = 300;
     private static final float MAX_DELTA_TIME = 0.05f;
+    private boolean hasStartedTimer = false;
+
 
     public enum GameState {
         MENU, PLAYING, PAUSED, WON
@@ -81,6 +83,7 @@ public class GameLogic {
         lastJumpTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         isRespawning = false;
+        hasStartedTimer = false;
 
         if (particles == null) {
             particles = new ParticleSystem();
@@ -90,15 +93,15 @@ public class GameLogic {
     }
 
     public void startGame() {
-        if (state != GameState.MENU) return;
-
         initializeGame();
-        gameStartTime = SystemClock.uptimeMillis();
+        // REMOVE THIS:
+        // gameStartTime = SystemClock.uptimeMillis();
+
+        state = GameState.PLAYING;
         totalPausedTime = 0;
         winTime = 0;
-        state = GameState.PLAYING;
+
         lastFrameTime = SystemClock.uptimeMillis();
-        // Set lastJumpTime to past to allow immediate first jump
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
     }
 
@@ -157,6 +160,12 @@ public class GameLogic {
         if (currentTime - lastJumpTime < INPUT_DELAY_MS) {
             return;
         }
+
+        if (!hasStartedTimer) {
+            hasStartedTimer = true;
+            gameStartTime = SystemClock.uptimeMillis();
+        }
+
         lastJumpTime = currentTime;
 
         PlatformGlass p = platforms[nextPlatform];
@@ -269,6 +278,7 @@ public class GameLogic {
     }
 
     public double getElapsedSeconds() {
+        if (!hasStartedTimer) return 0;
         if (state == GameState.MENU) {
             return 0;
         }

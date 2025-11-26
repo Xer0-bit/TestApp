@@ -2,15 +2,23 @@ package com.example.testapp;
 
 public class Player {
 
+    private static final float JUMP_SPEED = 0.15f;
+    private static final float FALL_SPEED = 0.3f;
+    private static final float FALL_THRESHOLD = -2f;
+    private static final float POSITION_EPSILON = 0.01f;
+    private static final float PLAYER_SIZE = 0.4f;
+
     public float x, y, z;
 
-    private float jumpSpeed = 0.15f;
     private float targetX, targetY, targetZ;
     private boolean jumping = false;
     private boolean falling = false;
 
     // Save start position to reset after wrong step
     private final float startX, startY, startZ;
+
+    // Player color
+    private final float[] playerColor = {1f, 0.8f, 0.1f, 1f}; // Gold/yellow
 
     public Player(float startX, float startY, float startZ) {
         this.startX = startX;
@@ -26,8 +34,13 @@ public class Player {
         targetZ = z;
     }
 
-    public boolean isJumping() { return jumping; }
-    public boolean isFalling() { return falling; }
+    public boolean isJumping() {
+        return jumping;
+    }
+
+    public boolean isFalling() {
+        return falling;
+    }
 
     public void jumpTo(float tX, float tY, float tZ) {
         targetX = tX;
@@ -46,7 +59,7 @@ public class Player {
         jumping = false;
         falling = false;
 
-        // reset to start
+        // Reset to start position
         x = startX;
         y = startY;
         z = startZ;
@@ -62,29 +75,33 @@ public class Player {
             float dy = targetY - y;
             float dz = targetZ - z;
 
-            if (Math.abs(dx) < 0.01f && Math.abs(dy) < 0.01f && Math.abs(dz) < 0.01f) {
+            // Check if player has reached target
+            if (Math.abs(dx) < POSITION_EPSILON &&
+                    Math.abs(dy) < POSITION_EPSILON &&
+                    Math.abs(dz) < POSITION_EPSILON) {
                 x = targetX;
                 y = targetY;
                 z = targetZ;
                 jumping = false;
             } else {
-                x += dx * jumpSpeed;
-                y += dy * jumpSpeed;
-                z += dz * jumpSpeed;
+                x += dx * JUMP_SPEED;
+                y += dy * JUMP_SPEED;
+                z += dz * JUMP_SPEED;
             }
         }
 
         if (falling) {
-            y -= 0.3f;
-            if (y < -2f) respawn();
+            y -= FALL_SPEED;
+            if (y < FALL_THRESHOLD) {
+                respawn();
+            }
         }
     }
 
     public void draw(float[] vpMatrix) {
-        float[] color = {1f, 0.8f, 0.1f, 1f};
         Cube c = new Cube(x, y, z);
-        c.size = 0.4f;
+        c.size = PLAYER_SIZE;
         c.modelRotationX = 0;
-        c.draw(vpMatrix, color);
+        c.draw(vpMatrix, playerColor);
     }
 }

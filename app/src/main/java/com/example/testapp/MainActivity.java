@@ -2,6 +2,7 @@ package com.example.testapp;
 
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.Button;
@@ -12,13 +13,16 @@ import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final long UI_UPDATE_INTERVAL_MS = 100;
+
     private GameSurfaceView gameView;
-    private Handler uiHandler = new Handler();
+    private Handler uiHandler;
     private TextView tvTimer;
     private Runnable tickRunnable;
 
     private LinearLayout mainMenu, pauseMenu, winMenu;
-    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu, btnRestartWin, btnReturnMenuWin;
+    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu,
+            btnRestartWin, btnReturnMenuWin;
     private GameLogic logic;
 
     private boolean winMenuShown = false;
@@ -29,6 +33,13 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        initializeViews();
+        initializeGameLogic();
+        setupButtonListeners();
+        startUIUpdateLoop();
+    }
+
+    private void initializeViews() {
         gameView = findViewById(R.id.gameView);
         tvTimer = findViewById(R.id.tvTimer);
 
@@ -43,69 +54,91 @@ public class MainActivity extends AppCompatActivity {
         btnRestartWin = findViewById(R.id.btnRestartWin);
         btnReturnMenuWin = findViewById(R.id.btnReturnMenuWin);
 
+        uiHandler = new Handler(Looper.getMainLooper());
+    }
+
+    private void initializeGameLogic() {
+        if (gameView == null || gameView.getRenderer() == null) {
+            throw new IllegalStateException("GameView or Renderer failed to initialize");
+        }
+
         logic = gameView.getRenderer().getLogic();
 
         if (logic == null) {
-            return; // Emergency exit if logic failed to initialize
+            throw new IllegalStateException("GameLogic failed to initialize");
         }
+    }
 
+    private void setupButtonListeners() {
         btnStartGame.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            mainMenu.setVisibility(View.GONE);
-            winMenuShown = false;
-            logic.startGame();
+            if (isSafeToExecute()) {
+                mainMenu.setVisibility(View.GONE);
+                winMenuShown = false;
+                logic.startGame();
+            }
         });
 
         btnResume.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            logic.resumeGame();
-            pauseMenu.setVisibility(View.GONE);
+            if (isSafeToExecute()) {
+                logic.resumeGame();
+                pauseMenu.setVisibility(View.GONE);
+            }
         });
 
         btnRestartPause.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            pauseMenu.setVisibility(View.GONE);
-            winMenuShown = false;
-            logic.restartGame();
+            if (isSafeToExecute()) {
+                pauseMenu.setVisibility(View.GONE);
+                winMenuShown = false;
+                logic.restartGame();
+            }
         });
 
         btnReturnMenu.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            logic.returnToMenu();
-            pauseMenu.setVisibility(View.GONE);
-            mainMenu.setVisibility(View.VISIBLE);
-            winMenuShown = false;
+            if (isSafeToExecute()) {
+                logic.returnToMenu();
+                pauseMenu.setVisibility(View.GONE);
+                mainMenu.setVisibility(View.VISIBLE);
+                winMenuShown = false;
+            }
         });
 
         btnRestartWin.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            winMenu.setVisibility(View.GONE);
-            winMenuShown = false;
-            logic.restartGame();
+            if (isSafeToExecute()) {
+                winMenu.setVisibility(View.GONE);
+                winMenuShown = false;
+                logic.restartGame();
+            }
         });
 
         btnReturnMenuWin.setOnClickListener(v -> {
-            if (logic == null || isActivityDestroyed) return;
-            winMenu.setVisibility(View.GONE);
-            winMenuShown = false;
-            logic.returnToMenu();
-            mainMenu.setVisibility(View.VISIBLE);
+            if (isSafeToExecute()) {
+                winMenu.setVisibility(View.GONE);
+                winMenuShown = false;
+                logic.returnToMenu();
+                mainMenu.setVisibility(View.VISIBLE);
+            }
         });
+    }
 
+    private void startUIUpdateLoop() {
         tickRunnable = new Runnable() {
             @Override
             public void run() {
                 if (!isActivityDestroyed) {
                     updateTimerUI();
-                    uiHandler.postDelayed(this, 100);
+                    uiHandler.postDelayed(this, UI_UPDATE_INTERVAL_MS);
                 }
             }
         };
         uiHandler.post(tickRunnable);
     }
 
+    private boolean isSafeToExecute() {
+        return logic != null && !isActivityDestroyed;
+    }
+
     private void updateTimerUI() {
-        if (logic == null || isActivityDestroyed) return;
+        if (!isSafeToExecute()) return;
 
         try {
             double elapsed = logic.getElapsedSeconds();
@@ -137,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (logic == null || isActivityDestroyed) return super.onKeyDown(keyCode, event);
+        if (!isSafeToExecute()) return super.onKeyDown(keyCode, event);
 
         if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
             if (logic.isPlaying()) {
@@ -158,11 +191,11 @@ public class MainActivity extends AppCompatActivity {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_A:
-                logic.jumpLeft();
+                logic.jumpRight(); // Left key jumps to RIGHT platform
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_D:
-                logic.jumpRight();
+                logic.jumpLeft(); // Right key jumps to LEFT platform
                 return true;
         }
 
@@ -194,12 +227,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         isActivityDestroyed = true;
+
         if (uiHandler != null && tickRunnable != null) {
             uiHandler.removeCallbacks(tickRunnable);
         }
+
         if (gameView != null) {
             gameView.onPause();
         }
+
         // Release OpenGL resources
         if (gameView != null && gameView.getRenderer() != null) {
             gameView.getRenderer().release();

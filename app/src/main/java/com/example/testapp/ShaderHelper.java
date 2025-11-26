@@ -31,6 +31,11 @@ public class ShaderHelper {
         int vs = loadShader(GLES20.GL_VERTEX_SHADER, VERTEX_SHADER);
         int fs = loadShader(GLES20.GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
 
+        if (vs == 0 || fs == 0) {
+            Log.e(TAG, "Failed to load shaders");
+            return;
+        }
+
         program = GLES20.glCreateProgram();
         GLES20.glAttachShader(program, vs);
         GLES20.glAttachShader(program, fs);
@@ -48,12 +53,19 @@ public class ShaderHelper {
         aPositionHandle = GLES20.glGetAttribLocation(program, "aPosition");
         uMVPMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
         uColorHandle = GLES20.glGetUniformLocation(program, "uColor");
+
+        // Clean up shaders after linking
+        GLES20.glDeleteShader(vs);
+        GLES20.glDeleteShader(fs);
     }
 
     public static void release() {
-        if (program != 0) {
+        if (program != -1) {
             GLES20.glDeleteProgram(program);
-            program = 0;
+            program = -1;
+            aPositionHandle = -1;
+            uMVPMatrixHandle = -1;
+            uColorHandle = -1;
         }
     }
 
@@ -71,5 +83,4 @@ public class ShaderHelper {
         }
         return shader;
     }
-
 }

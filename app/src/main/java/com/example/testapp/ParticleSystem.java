@@ -6,8 +6,23 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Random;
 
 public class ParticleSystem {
+
+    private static final float GRAVITY = 0.02f;
+    private static final float PARTICLE_LIFETIME_STEP = 0.016f; // ~60fps
+    private static final float SPHERE_RADIUS = 0.1f;
+    private static final int SPHERE_LATS = 6;
+    private static final int SPHERE_LONS = 6;
+
+    // Particle counts
+    private static final int BREAK_PARTICLE_COUNT = 12;
+    private static final int LAND_PARTICLE_COUNT = 8;
+
+    // Colors
+    private static final float[] BREAK_COLOR = {0.4f, 0.8f, 1f, 0.8f}; // Blue glass
+    private static final float[] LAND_COLOR = {1f, 0.8f, 0.1f, 0.7f}; // Gold
 
     private static class Particle {
         float x, y, z;
@@ -16,7 +31,8 @@ public class ParticleSystem {
         float[] color;
         float size;
 
-        Particle(float x, float y, float z, float vx, float vy, float vz, float life, float[] color, float size) {
+        Particle(float x, float y, float z, float vx, float vy, float vz,
+                 float life, float[] color, float size) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -33,20 +49,25 @@ public class ParticleSystem {
             x += vx;
             y += vy;
             z += vz;
-            vy -= 0.02f; // gravity
-            life -= 0.016f; // ~60fps
+            vy -= GRAVITY;
+            life -= PARTICLE_LIFETIME_STEP;
         }
 
         boolean isAlive() {
             return life > 0;
         }
+
+        float getAlpha() {
+            return life / maxLife;
+        }
     }
 
     private ArrayList<Particle> particles = new ArrayList<>();
+    private Random random = new Random();
     private float[] modelMatrix = new float[16];
     private float[] mvpMatrix = new float[16];
 
-    private static final float[] SPHERE_VERTICES = generateSphere(0.1f, 6, 6);
+    private static final float[] SPHERE_VERTICES = generateSphere(SPHERE_RADIUS, SPHERE_LATS, SPHERE_LONS);
     private static FloatBuffer sphereBuffer;
 
     static {
@@ -83,26 +104,24 @@ public class ParticleSystem {
     }
 
     public void spawnBreakEffect(float x, float y, float z) {
-        float[] color = {0.4f, 0.8f, 1f, 0.8f};
-        for (int i = 0; i < 12; i++) {
-            float angle = (float) (Math.random() * Math.PI * 2);
-            float speed = (float) (Math.random() * 0.15f + 0.05f);
+        for (int i = 0; i < BREAK_PARTICLE_COUNT; i++) {
+            float angle = random.nextFloat() * (float) Math.PI * 2;
+            float speed = random.nextFloat() * 0.15f + 0.05f;
             float vx = (float) Math.cos(angle) * speed;
             float vz = (float) Math.sin(angle) * speed;
-            float vy = (float) (Math.random() * 0.1f + 0.05f);
-            particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, color, 0.08f));
+            float vy = random.nextFloat() * 0.1f + 0.05f;
+            particles.add(new Particle(x, y, z, vx, vy, vz, 1.2f, BREAK_COLOR, 0.08f));
         }
     }
 
     public void spawnLandEffect(float x, float y, float z) {
-        float[] color = {1f, 0.8f, 0.1f, 0.7f};
-        for (int i = 0; i < 8; i++) {
-            float angle = (float) (Math.random() * Math.PI * 2);
-            float speed = (float) (Math.random() * 0.1f + 0.03f);
+        for (int i = 0; i < LAND_PARTICLE_COUNT; i++) {
+            float angle = random.nextFloat() * (float) Math.PI * 2;
+            float speed = random.nextFloat() * 0.1f + 0.03f;
             float vx = (float) Math.cos(angle) * speed;
             float vz = (float) Math.sin(angle) * speed;
-            float vy = (float) (Math.random() * 0.05f + 0.02f);
-            particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, color, 0.06f));
+            float vy = random.nextFloat() * 0.05f + 0.02f;
+            particles.add(new Particle(x, y, z, vx, vy, vz, 0.8f, LAND_COLOR, 0.06f));
         }
     }
 
@@ -132,14 +151,15 @@ public class ParticleSystem {
             Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
 
             float[] color = p.color.clone();
-            color[3] *= (p.life / p.maxLife); // fade out
+            color[3] *= p.getAlpha(); // Fade out over time
 
             GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
             GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
 
             sphereBuffer.position(0);
             GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
-            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3, GLES20.GL_FLOAT, false, 0, sphereBuffer);
+            GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3,
+                    GLES20.GL_FLOAT, false, 0, sphereBuffer);
             GLES20.glDrawArrays(GLES20.GL_POINTS, 0, SPHERE_VERTICES.length / 3);
             GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
         }

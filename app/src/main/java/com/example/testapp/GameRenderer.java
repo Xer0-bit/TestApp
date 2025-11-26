@@ -23,6 +23,11 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     public static float[] viewMatrix = new float[16];
     public static float[] vpMatrix = new float[16];
 
+    private static final float CAMERA_HEIGHT = 4f;
+    private static final float CAMERA_DISTANCE = 8f;
+    private static final float LOOK_AHEAD_DISTANCE = 5f;
+    private static final float SHAKE_DAMPING = 0.5f;
+
     public GameRenderer(Context ctx) {
         context = ctx;
         logic = new GameLogic();
@@ -58,24 +63,27 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         Player player = logic.player;
         if (player == null) return;
 
-        // Calculate shake ONCE per frame and cache it
+        // Calculate shake ONCE per frame and cache it (skip if no shake)
         float shake = logic.getShakeAmount();
-        cachedShakeX = (shakeRandom.nextFloat() - 0.5f) * shake;
-        cachedShakeY = (shakeRandom.nextFloat() - 0.5f) * shake;
-        cachedShakeZ = (shakeRandom.nextFloat() - 0.5f) * shake;
+        if (shake > 0) {
+            cachedShakeX = (shakeRandom.nextFloat() - 0.5f) * shake;
+            cachedShakeY = (shakeRandom.nextFloat() - 0.5f) * shake;
+            cachedShakeZ = (shakeRandom.nextFloat() - 0.5f) * shake;
+        } else {
+            cachedShakeX = 0;
+            cachedShakeY = 0;
+            cachedShakeZ = 0;
+        }
 
         // Camera positioned above and behind, looking down the platforms
-        float camHeight = 4f;
-        float camDistance = 8f;
-
         float camX = cachedShakeX;
-        float camY = player.y + camHeight + cachedShakeY;
-        float camZ = player.z - camDistance + cachedShakeZ;
+        float camY = player.y + CAMERA_HEIGHT + cachedShakeY;
+        float camZ = player.z - CAMERA_DISTANCE + cachedShakeZ;
 
         // Look at point: centered between platforms, slightly ahead of player
-        float lookX = cachedShakeX * 0.5f;
-        float lookY = player.y + cachedShakeY * 0.5f;
-        float lookZ = player.z + 5f + cachedShakeZ * 0.5f;
+        float lookX = cachedShakeX * SHAKE_DAMPING;
+        float lookY = player.y + cachedShakeY * SHAKE_DAMPING;
+        float lookZ = player.z + LOOK_AHEAD_DISTANCE + cachedShakeZ * SHAKE_DAMPING;
 
         Matrix.setLookAtM(viewMatrix, 0,
                 camX, camY, camZ,
@@ -87,7 +95,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         // Draw solids with depth write
         logic.draw(vpMatrix);
 
-        // Draw particles without depth write (so they don't hide behind glass)
+        // Draw particles without depth write to ensure visibility
         GLES20.glDepthMask(false);
         if (logic.particles != null) {
             logic.particles.draw(vpMatrix);
@@ -96,6 +104,9 @@ public class GameRenderer implements GLSurfaceView.Renderer {
     }
 
     public void release() {
+        if (logic != null) {
+            logic.cleanup();
+        }
         ShaderHelper.release();
     }
 }

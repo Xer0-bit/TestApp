@@ -8,10 +8,20 @@ import java.util.Random;
 
 public class GameLogic {
 
+    // Constants
     private static final int TOTAL_PLATFORMS = 6;
     private static final float PLATFORM_Y = 1.0f;
     private static final float PLATFORM_Z_SPACING = 5f;
     private static final long INPUT_DELAY_MS = 200;
+    private static final float GRAVITY = 0.02f;
+    private static final float FALL_SPEED = 0.05f;
+    private static final float JUMP_LAND_SHAKE = 0.15f;
+    private static final float GLASS_BREAK_SHAKE = 0.25f;
+    private static final float SHAKE_DECAY_RATE = 3.0f;
+    private static final long RESPAWN_DELAY_MS = 1000;
+    private static final long POST_RESPAWN_COOLDOWN_MS = 250;
+    private static final long LAND_EFFECT_DELAY_MS = 300;
+    private static final float MAX_DELTA_TIME = 0.05f;
 
     public enum GameState {
         MENU, PLAYING, PAUSED, WON
@@ -33,12 +43,11 @@ public class GameLogic {
     private double bestTime = Double.MAX_VALUE;
 
     private float shakeAmount = 0f;
-    private float shakeDecay = 0f;
     private long lastJumpTime = 0;
     private long lastFrameTime = 0;
+    private boolean isRespawning = false;
 
     public GameLogic() {
-        // Use static handler to avoid Activity leak
         handler = new Handler(Looper.getMainLooper());
         particles = new ParticleSystem();
         initializeGame();
@@ -66,9 +75,9 @@ public class GameLogic {
 
         nextPlatform = 0;
         shakeAmount = 0f;
-        shakeDecay = 0f;
-        lastJumpTime = SystemClock.uptimeMillis();
+        lastJumpTime = 0; // Reset to allow immediate first jump
         lastFrameTime = SystemClock.uptimeMillis();
+        isRespawning = false;
 
         if (particles == null) {
             particles = new ParticleSystem();
@@ -86,6 +95,7 @@ public class GameLogic {
         winTime = 0;
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
+        lastJumpTime = 0; // Allow immediate first jump
     }
 
     public void restartGame() {
@@ -95,6 +105,7 @@ public class GameLogic {
         winTime = 0;
         state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
+        lastJumpTime = 0; // Allow immediate first jump
     }
 
     public void pauseGame() {
@@ -133,6 +144,11 @@ public class GameLogic {
             return;
         }
 
+        // Prevent input during respawn animation
+        if (isRespawning) {
+            return;
+        }
+
         long currentTime = SystemClock.uptimeMillis();
         if (currentTime - lastJumpTime < INPUT_DELAY_MS) {
             return;
@@ -148,10 +164,9 @@ public class GameLogic {
             handler.postDelayed(() -> {
                 if (player != null && particles != null && state == GameState.PLAYING) {
                     particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
-                    shakeAmount = 0.15f;
-                    shakeDecay = 0.15f;
+                    shakeAmount = JUMP_LAND_SHAKE;
                 }
-            }, 300);
+            }, LAND_EFFECT_DELAY_MS);
 
             if (nextPlatform >= TOTAL_PLATFORMS) {
                 winGame();
@@ -163,19 +178,21 @@ public class GameLogic {
                 particles.spawnBreakEffect(p.getX(left), p.getY(), p.getZ());
             }
 
-            shakeAmount = 0.25f;
-            shakeDecay = 0.25f;
+            shakeAmount = GLASS_BREAK_SHAKE;
 
             if (player != null) {
                 player.fall();
+                isRespawning = true;
+
                 handler.postDelayed(() -> {
                     if (player != null && state == GameState.PLAYING) {
                         player.respawn();
                         nextPlatform = 0;
+                        isRespawning = false;
                         // Force cooldown after respawn
-                        lastJumpTime = SystemClock.uptimeMillis() + 250;
+                        lastJumpTime = SystemClock.uptimeMillis() + POST_RESPAWN_COOLDOWN_MS;
                     }
-                }, 1000);
+                }, RESPAWN_DELAY_MS);
             }
         }
     }
@@ -208,7 +225,7 @@ public class GameLogic {
         lastFrameTime = currentTime;
 
         // Clamp deltaTime to prevent large jumps
-        deltaTime = Math.min(deltaTime, 0.05f); // max 50ms per frame
+        deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
         player.update();
 
@@ -222,9 +239,9 @@ public class GameLogic {
             particles.update();
         }
 
-        // Decay shake with proper delta time and clamping
+        // Decay shake with proper delta time
         if (shakeAmount > 0) {
-            shakeAmount = Math.max(0f, shakeAmount - shakeDecay * deltaTime);
+            shakeAmount = Math.max(0f, shakeAmount - SHAKE_DECAY_RATE * deltaTime);
         }
     }
 
@@ -265,4 +282,10 @@ public class GameLogic {
     public boolean isPlaying() { return state == GameState.PLAYING; }
     public boolean isGameWon() { return state == GameState.WON; }
     public double getBestTime() { return bestTime == Double.MAX_VALUE ? 0 : bestTime; }
+
+    public void cleanup() {
+        if (handler != null) {
+            handler.removeCallbacksAndMessages(null);
+        }
+    }
 }

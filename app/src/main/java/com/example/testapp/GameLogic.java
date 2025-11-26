@@ -1,6 +1,9 @@
 package com.example.testapp;
 
 import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+
 import java.util.Random;
 
 public class GameLogic {
@@ -20,7 +23,7 @@ public class GameLogic {
 
     private int nextPlatform = 0;
     private Random random = new Random();
-    private Handler handler = new Handler();
+    private Handler handler;
 
     private GameState state = GameState.MENU;
     private long gameStartTime = 0;
@@ -32,8 +35,11 @@ public class GameLogic {
     private float shakeAmount = 0f;
     private float shakeDecay = 0f;
     private long lastJumpTime = 0;
+    private long lastFrameTime = 0;
 
     public GameLogic() {
+        // Use static handler to avoid Activity leak
+        handler = new Handler(Looper.getMainLooper());
         particles = new ParticleSystem();
         initializeGame();
     }
@@ -61,10 +67,13 @@ public class GameLogic {
         nextPlatform = 0;
         shakeAmount = 0f;
         shakeDecay = 0f;
-        lastJumpTime = 0;
+        lastJumpTime = SystemClock.uptimeMillis();
+        lastFrameTime = SystemClock.uptimeMillis();
 
         if (particles == null) {
             particles = new ParticleSystem();
+        } else {
+            particles.clear();
         }
     }
 
@@ -72,31 +81,34 @@ public class GameLogic {
         if (state != GameState.MENU) return;
 
         initializeGame();
-        gameStartTime = System.currentTimeMillis();
+        gameStartTime = SystemClock.uptimeMillis();
         totalPausedTime = 0;
         winTime = 0;
         state = GameState.PLAYING;
+        lastFrameTime = SystemClock.uptimeMillis();
     }
 
     public void restartGame() {
         initializeGame();
-        gameStartTime = System.currentTimeMillis();
+        gameStartTime = SystemClock.uptimeMillis();
         totalPausedTime = 0;
         winTime = 0;
         state = GameState.PLAYING;
+        lastFrameTime = SystemClock.uptimeMillis();
     }
 
     public void pauseGame() {
         if (state != GameState.PLAYING) return;
-        pauseStartTime = System.currentTimeMillis();
+        pauseStartTime = SystemClock.uptimeMillis();
         state = GameState.PAUSED;
     }
 
     public void resumeGame() {
         if (state != GameState.PAUSED) return;
-        long pauseDuration = System.currentTimeMillis() - pauseStartTime;
+        long pauseDuration = SystemClock.uptimeMillis() - pauseStartTime;
         totalPausedTime += pauseDuration;
         state = GameState.PLAYING;
+        lastFrameTime = SystemClock.uptimeMillis();
     }
 
     public void returnToMenu() {
@@ -117,12 +129,11 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
-        // Safety check
         if (platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
             return;
         }
 
-        long currentTime = System.currentTimeMillis();
+        long currentTime = SystemClock.uptimeMillis();
         if (currentTime - lastJumpTime < INPUT_DELAY_MS) {
             return;
         }
@@ -135,7 +146,7 @@ public class GameLogic {
             nextPlatform++;
 
             handler.postDelayed(() -> {
-                if (player != null && particles != null) {
+                if (player != null && particles != null && state == GameState.PLAYING) {
                     particles.spawnLandEffect(player.x, PLATFORM_Y, player.z);
                     shakeAmount = 0.15f;
                     shakeDecay = 0.15f;
@@ -161,7 +172,8 @@ public class GameLogic {
                     if (player != null && state == GameState.PLAYING) {
                         player.respawn();
                         nextPlatform = 0;
-                        lastJumpTime = System.currentTimeMillis() - INPUT_DELAY_MS;
+                        // Force cooldown after respawn
+                        lastJumpTime = SystemClock.uptimeMillis() + 250;
                     }
                 }, 1000);
             }
@@ -169,10 +181,10 @@ public class GameLogic {
     }
 
     private void winGame() {
-        if (state != GameState.PLAYING) return; // Prevent double-win
+        if (state != GameState.PLAYING) return;
 
         state = GameState.WON;
-        winTime = System.currentTimeMillis();
+        winTime = SystemClock.uptimeMillis();
         double elapsed = getElapsedSeconds();
         if (elapsed < bestTime) {
             bestTime = elapsed;
@@ -190,6 +202,14 @@ public class GameLogic {
 
         if (player == null || platforms == null) return;
 
+        // Calculate delta time
+        long currentTime = SystemClock.uptimeMillis();
+        float deltaTime = (currentTime - lastFrameTime) / 1000.0f;
+        lastFrameTime = currentTime;
+
+        // Clamp deltaTime to prevent large jumps
+        deltaTime = Math.min(deltaTime, 0.05f); // max 50ms per frame
+
         player.update();
 
         for (PlatformGlass p : platforms) {
@@ -202,8 +222,9 @@ public class GameLogic {
             particles.update();
         }
 
+        // Decay shake with proper delta time and clamping
         if (shakeAmount > 0) {
-            shakeAmount -= shakeDecay * 0.016f;
+            shakeAmount = Math.max(0f, shakeAmount - shakeDecay * deltaTime);
         }
     }
 
@@ -222,7 +243,7 @@ public class GameLogic {
     }
 
     public float getShakeAmount() {
-        return Math.max(0, shakeAmount); // Prevent negative shake
+        return Math.max(0, shakeAmount);
     }
 
     public double getElapsedSeconds() {
@@ -230,15 +251,14 @@ public class GameLogic {
             return 0;
         }
         if (state == GameState.WON) {
-            if (winTime == 0) return 0; // Safety check
+            if (winTime == 0) return 0;
             return (winTime - gameStartTime - totalPausedTime) / 1000.0;
         }
         if (state == GameState.PAUSED) {
-            if (pauseStartTime == 0) return 0; // Safety check
+            if (pauseStartTime == 0) return 0;
             return (pauseStartTime - gameStartTime - totalPausedTime) / 1000.0;
         }
-        // PLAYING state
-        return (System.currentTimeMillis() - gameStartTime - totalPausedTime) / 1000.0;
+        return (SystemClock.uptimeMillis() - gameStartTime - totalPausedTime) / 1000.0;
     }
 
     public GameState getGameState() { return state; }

@@ -200,5 +200,9 @@ public class MainActivity extends AppCompatActivity {
         if (gameView != null) {
             gameView.onPause();
         }
+        // Release OpenGL resources
+        if (gameView != null && gameView.getRenderer() != null) {
+            gameView.getRenderer().release();
+        }
     }
 }

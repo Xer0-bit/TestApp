@@ -25,6 +25,11 @@ public class PlatformGlass {
         return 1.0f + index * 1.5f;
     }
 
+    public float getZ() {
+        return -5f - index * 3f;
+    }
+
+
     public void breakSide(boolean left) {
         if (left) leftBroken = true;
         else rightBroken = true;

@@ -31,6 +31,8 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         GLES20.glClearColor(0.6f, 0.7f, 0.9f, 1f);
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+
+        ShaderHelper.init(); // <<< ADD THIS
     }
 
     @Override

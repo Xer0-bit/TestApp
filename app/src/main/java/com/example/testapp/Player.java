@@ -8,9 +8,10 @@ public class Player {
 
     private boolean falling = false;
 
-    public void jumpTo(float targetX, float targetY) {
+    public void jumpTo(float targetX, float targetY, float targetZ) {
         x = targetX;
         y = targetY;
+        z = targetZ;
         falling = false;
     }
 

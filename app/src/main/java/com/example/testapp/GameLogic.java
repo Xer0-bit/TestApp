@@ -51,7 +51,7 @@ public class GameLogic {
         PlatformGlass p = platforms[currentJump];
 
         if (p.isCorrect(left)) {
-            player.jumpTo(p.getX(left), p.getY());
+            player.jumpTo(p.getX(left), p.getY(), p.getZ());
             currentJump++;
 
             if (currentJump == TOTAL_JUMPS) {

@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         btnRestartWin.setOnClickListener(v -> {
             logic.startGame();
             winMenu.setVisibility(View.GONE);
+            tvTimer.setText("Time: 0.00s");
         });
 
         btnReturnMenuWin.setOnClickListener(v -> {
@@ -90,14 +91,20 @@ public class MainActivity extends AppCompatActivity {
         double elapsed = logic.getElapsedSeconds();
         tvTimer.setText(String.format("Time: %.2fs", elapsed));
 
-        // Check if game was won
+        // Check if game was won and win menu is not already showing
         if (logic.isGameWon() && winMenu.getVisibility() != View.VISIBLE) {
             winMenu.setVisibility(View.VISIBLE);
+            double currentTime = logic.getElapsedSeconds();
             double bestTime = logic.getBestTime();
             TextView tvWinTime = findViewById(R.id.tvWinTime);
             TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
-            tvWinTime.setText(String.format("You Won!\nTime: %.2fs", elapsed));
+            tvWinTime.setText(String.format("You Won!\nTime: %.2fs", currentTime));
             tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
+        }
+
+        // Hide win menu if game is no longer won (restarted)
+        if (!logic.isGameWon() && winMenu.getVisibility() == View.VISIBLE) {
+            winMenu.setVisibility(View.GONE);
         }
     }
 

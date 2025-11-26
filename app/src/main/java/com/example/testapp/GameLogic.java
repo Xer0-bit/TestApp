@@ -139,12 +139,13 @@ public class GameLogic {
                 player.respawn();
                 nextPlatform = 0;
                 lastJumpTime = System.currentTimeMillis() - INPUT_DELAY_MS; // allow immediate jump
-            }, 500);
+            }, 1000); // match fall animation duration
         }
     }
 
     private void winGame() {
         state = GameState.WON;
+        pauseStartTime = System.currentTimeMillis(); // capture current time for win state
         double elapsed = getElapsedSeconds();
         if (elapsed < bestTime) {
             bestTime = elapsed;

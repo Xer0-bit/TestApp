@@ -13,11 +13,14 @@ public class Player {
     public float x, y, z;
 
     private float targetX, targetY, targetZ;
-    private boolean jumping = false;
-    private boolean falling = false;
+    private volatile boolean jumping = false;
+    private volatile boolean falling = false;
 
     // Save start position to reset after wrong step
     private float startX, startY, startZ;
+
+    // Debug frame counter
+    private int frameCount = 0;
 
     // Player color - Mystical glowing entity
     private float[] playerColor = {0.9f, 0.7f, 0.3f, 1f}; // Golden magical glow
@@ -53,8 +56,11 @@ public class Player {
     }
 
     public void fall() {
+        android.util.Log.d("PLAYER_FALL", "fall() called - setting falling=true");
         jumping = false;
         falling = true;
+        // Set target below to ensure falling continues
+        targetY = -10f;
     }
 
     public void respawn() {
@@ -99,9 +105,8 @@ public class Player {
 
         if (falling) {
             y -= FALL_SPEED;
-            if (y < FALL_THRESHOLD) {
-                respawn();
-            }
+            // Don't auto-respawn here - let GameLogic handle it
+            // Keep falling flag true until explicitly reset by respawn()
         }
     }
 

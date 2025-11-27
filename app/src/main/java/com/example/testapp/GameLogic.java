@@ -174,33 +174,40 @@ public class GameLogic {
 
         PlatformGlass p = platforms[nextPlatform];
 
-        if (p.isCorrect(left) || p.isFinish()) {
-            player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
-            nextPlatform++;
+        // Always jump to the platform first
+        player.jumpTo(p.getX(left), PLATFORM_Y, p.getZ());
+        nextPlatform++;
 
+        if (p.isCorrect(left) || p.isFinish()) {
+            // Correct platform - just land with shake
             shakeAmount = JUMP_LAND_SHAKE;
 
             if (nextPlatform >= TOTAL_PLATFORMS) {
                 scheduleOnGLThread(this::winGame, 0);
             }
         } else {
-            p.breakSide(left);
-            shakeAmount = GLASS_BREAK_SHAKE;
+            // Wrong platform - wait for player to land, then break it
+            scheduleOnGLThread(() -> {
+                if (isActive && player != null && state == GameState.PLAYING) {
+                    // Break the platform
+                    p.breakSide(left);
+                    shakeAmount = GLASS_BREAK_SHAKE;
 
-            if (player != null) {
-                player.fall();
-                isRespawning = true;
+                    // Make player fall
+                    player.fall();
+                    isRespawning = true;
 
-                // Schedule respawn
-                scheduleOnGLThread(() -> {
-                    if (isActive && player != null && state == GameState.PLAYING) {
-                        player.respawn();
-                        nextPlatform = 1; // Reset to first glass platform
-                        isRespawning = false;
-                        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
-                    }
-                }, RESPAWN_DELAY_MS);
-            }
+                    // Schedule respawn after falling
+                    scheduleOnGLThread(() -> {
+                        if (isActive && player != null && state == GameState.PLAYING) {
+                            player.respawn();
+                            nextPlatform = 1; // Reset to first glass platform
+                            isRespawning = false;
+                            lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+                        }
+                    }, RESPAWN_DELAY_MS);
+                }
+            }, 300); // Wait 300ms for player to land before breaking
         }
     }
 

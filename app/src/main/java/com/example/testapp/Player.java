@@ -19,12 +19,6 @@ public class Player {
     // Save start position to reset after wrong step
     private float startX, startY, startZ;
 
-    // Debug frame counter
-    private int frameCount = 0;
-
-    // Player color - Mystical glowing entity
-    private float[] playerColor = {0.9f, 0.7f, 0.3f, 1f}; // Golden magical glow
-
     public Player(float startX, float startY, float startZ) {
         this.startX = startX;
         this.startY = startY;
@@ -59,7 +53,6 @@ public class Player {
         android.util.Log.d("PLAYER_FALL", "fall() called - setting falling=true");
         jumping = false;
         falling = true;
-        // Set target below to ensure falling continues
         targetY = -10f;
     }
 
@@ -67,7 +60,6 @@ public class Player {
         jumping = false;
         falling = false;
 
-        // Reset to start position
         x = startX;
         y = startY;
         z = startZ;
@@ -88,7 +80,6 @@ public class Player {
             float dy = targetY - y;
             float dz = targetZ - z;
 
-            // Check if player has reached target
             if (Math.abs(dx) < POSITION_EPSILON &&
                     Math.abs(dy) < POSITION_EPSILON &&
                     Math.abs(dz) < POSITION_EPSILON) {
@@ -105,137 +96,181 @@ public class Player {
 
         if (falling) {
             y -= FALL_SPEED;
-            // Don't auto-respawn here - let GameLogic handle it
-            // Keep falling flag true until explicitly reset by respawn()
         }
     }
 
     public void draw(float[] vpMatrix) {
-        // Animated time
         float time = android.os.SystemClock.uptimeMillis() / 1000f;
-        float bobAmount = (float) Math.sin(time * 3f) * 0.03f;
+        float bobAmount = falling ? 0f : (float) Math.sin(time * 3f) * 0.03f;
         float starPulse = (float) Math.sin(time * 4f) * 0.15f + 0.85f;
 
-        // Wizard robe body (more subtle taper)
-        float[] robeColor = {0.25f, 0.2f, 0.45f, 1f}; // Dark purple robe
+        // Create transformation matrix for the entire wizard
+        float[] wizardMatrix = new float[16];
+        float[] finalVPMatrix = new float[16];
 
-        // Lower robe (slightly wider)
+        if (falling) {
+            // Apply rotation to entire wizard when falling
+            android.opengl.Matrix.setIdentityM(wizardMatrix, 0);
+            android.opengl.Matrix.translateM(wizardMatrix, 0, x, y, z);
+            android.opengl.Matrix.rotateM(wizardMatrix, 0, time * 300f, 0f, 1f, 0f); // Spin
+            android.opengl.Matrix.rotateM(wizardMatrix, 0, 80f, 1f, 0f, 0f); // Tilt
+
+            // Create modified VP matrix that includes wizard transform
+            float[] tempMatrix = new float[16];
+            android.opengl.Matrix.setIdentityM(tempMatrix, 0);
+            android.opengl.Matrix.translateM(tempMatrix, 0, -x, -y, -z); // Undo position
+            android.opengl.Matrix.multiplyMM(finalVPMatrix, 0, wizardMatrix, 0, tempMatrix, 0);
+            android.opengl.Matrix.multiplyMM(wizardMatrix, 0, vpMatrix, 0, finalVPMatrix, 0);
+            finalVPMatrix = wizardMatrix;
+        } else {
+            finalVPMatrix = vpMatrix;
+        }
+
+        // Draw wizard using original Cube-based method
+        float[] robeColor = {0.25f, 0.2f, 0.45f, 1f};
+
+        // Lower robe
         Cube robeLower = new Cube(x, y + PLAYER_SIZE * 0.25f + bobAmount, z);
         robeLower.size = PLAYER_SIZE * 1.05f;
         robeLower.modelRotationX = 0;
-        robeLower.draw(vpMatrix, robeColor);
+        robeLower.draw(finalVPMatrix, robeColor);
+
+        // Bottom trim (black)
+        float[] bottomTrimColor = {0.1f, 0.1f, 0.15f, 1f};
+        Cube bottomTrim = new Cube(x, y + PLAYER_SIZE * 0.1f + bobAmount, z);
+        bottomTrim.size = PLAYER_SIZE * 1.15f;
+        bottomTrim.modelRotationX = 0;
+        bottomTrim.draw(finalVPMatrix, bottomTrimColor);
 
         // Mid robe
         Cube robeMid = new Cube(x, y + PLAYER_SIZE * 0.5f + bobAmount, z);
         robeMid.size = PLAYER_SIZE * 1.0f;
         robeMid.modelRotationX = 0;
-        robeMid.draw(vpMatrix, robeColor);
+        robeMid.draw(finalVPMatrix, robeColor);
 
-        // Upper robe/chest
+        // Upper robe
         Cube robeUpper = new Cube(x, y + PLAYER_SIZE * 0.75f + bobAmount, z);
         robeUpper.size = PLAYER_SIZE * 0.95f;
         robeUpper.modelRotationX = 0;
-        robeUpper.draw(vpMatrix, robeColor);
+        robeUpper.draw(finalVPMatrix, robeColor);
 
-        // Shoulders (connect body to arms better)
-        float[] shoulderColor = {0.2f, 0.15f, 0.4f, 1f}; // Slightly darker purple
+        // Shoulders
+        float[] shoulderColor = {0.2f, 0.15f, 0.4f, 1f};
         Cube shoulders = new Cube(x, y + PLAYER_SIZE * 0.95f + bobAmount, z);
         shoulders.size = PLAYER_SIZE * 1.1f;
         shoulders.modelRotationX = 0;
-        shoulders.draw(vpMatrix, shoulderColor);
+        shoulders.draw(finalVPMatrix, shoulderColor);
 
-        // Belt/sash (golden)
+        // Collar (black)
+        float[] collarColor = {0.1f, 0.1f, 0.15f, 1f};
+        Cube collar = new Cube(x, y + PLAYER_SIZE * 1.0f + bobAmount, z);
+        collar.size = PLAYER_SIZE * 1.0f;
+        collar.modelRotationX = 0;
+        collar.draw(finalVPMatrix, collarColor);
+
+        // Belt (gold - middle trim)
         float[] beltColor = {0.7f, 0.6f, 0.2f, 1f};
         Cube belt = new Cube(x, y + PLAYER_SIZE * 0.6f + bobAmount, z);
         belt.size = PLAYER_SIZE * 1.0f;
         belt.modelRotationX = 0;
-        belt.draw(vpMatrix, beltColor);
+        belt.draw(finalVPMatrix, beltColor);
 
-        // Arms (sleeves connecting to hands)
+        // Sleeves
         float[] sleeveColor = {0.22f, 0.18f, 0.42f, 1f};
-
-        // Left arm/sleeve
         Cube leftSleeve = new Cube(x - PLAYER_SIZE * 0.55f, y + PLAYER_SIZE * 0.8f + bobAmount, z);
         leftSleeve.size = PLAYER_SIZE * 0.35f;
         leftSleeve.modelRotationX = 0;
-        leftSleeve.draw(vpMatrix, sleeveColor);
+        leftSleeve.draw(finalVPMatrix, sleeveColor);
 
-        // Right arm/sleeve
         Cube rightSleeve = new Cube(x + PLAYER_SIZE * 0.55f, y + PLAYER_SIZE * 0.8f + bobAmount, z);
         rightSleeve.size = PLAYER_SIZE * 0.35f;
         rightSleeve.modelRotationX = 0;
-        rightSleeve.draw(vpMatrix, sleeveColor);
+        rightSleeve.draw(finalVPMatrix, sleeveColor);
 
-        // Hands (skin tone)
+        // Hands
         float[] handColor = {0.9f, 0.75f, 0.6f, 1f};
-
-        // Left hand
         Cube leftHand = new Cube(x - PLAYER_SIZE * 0.7f, y + PLAYER_SIZE * 0.65f + bobAmount, z);
         leftHand.size = PLAYER_SIZE * 0.3f;
         leftHand.modelRotationX = 0;
-        leftHand.draw(vpMatrix, handColor);
+        leftHand.draw(finalVPMatrix, handColor);
 
-        // Right hand
         Cube rightHand = new Cube(x + PLAYER_SIZE * 0.7f, y + PLAYER_SIZE * 0.65f + bobAmount, z);
         rightHand.size = PLAYER_SIZE * 0.3f;
         rightHand.modelRotationX = 0;
-        rightHand.draw(vpMatrix, handColor);
+        rightHand.draw(finalVPMatrix, handColor);
 
-        // Wizard head (neck area to head top)
+        // Neck and Head
         Cube neck = new Cube(x, y + PLAYER_SIZE * 1.05f + bobAmount, z);
         neck.size = PLAYER_SIZE * 0.5f;
         neck.modelRotationX = 0;
-        neck.draw(vpMatrix, handColor);
+        neck.draw(finalVPMatrix, handColor);
 
         Cube head = new Cube(x, y + PLAYER_SIZE * 1.3f + bobAmount, z);
         head.size = PLAYER_SIZE * 0.6f;
         head.modelRotationX = 0;
-        head.draw(vpMatrix, handColor);
+        head.draw(finalVPMatrix, handColor);
 
-        // Wizard hat (tall pointy hat)
-        float[] hatColor = {0.2f, 0.15f, 0.35f, 1f}; // Dark purple
-
-        // Hat brim
+        // Hat
+        float[] hatColor = {0.2f, 0.15f, 0.35f, 1f};
         Cube hatBrim = new Cube(x, y + PLAYER_SIZE * 1.55f + bobAmount, z);
         hatBrim.size = PLAYER_SIZE * 0.9f;
         hatBrim.modelRotationX = 0;
-        hatBrim.draw(vpMatrix, hatColor);
+        hatBrim.draw(finalVPMatrix, hatColor);
 
-        // Hat cone - stacked to make it tall and pointy
         Cube hatBase = new Cube(x, y + PLAYER_SIZE * 1.75f + bobAmount, z);
         hatBase.size = PLAYER_SIZE * 0.7f;
         hatBase.modelRotationX = 0;
-        hatBase.draw(vpMatrix, hatColor);
+        hatBase.draw(finalVPMatrix, hatColor);
 
         Cube hatMid = new Cube(x, y + PLAYER_SIZE * 2.0f + bobAmount, z);
         hatMid.size = PLAYER_SIZE * 0.5f;
         hatMid.modelRotationX = 0;
-        hatMid.draw(vpMatrix, hatColor);
+        hatMid.draw(finalVPMatrix, hatColor);
 
         Cube hatTop = new Cube(x, y + PLAYER_SIZE * 2.25f + bobAmount, z);
         hatTop.size = PLAYER_SIZE * 0.3f;
         hatTop.modelRotationX = 0;
-        hatTop.draw(vpMatrix, hatColor);
+        hatTop.draw(finalVPMatrix, hatColor);
 
-        // Golden stars on hat (pulsing)
+        // Stars on back of hat (using drawWithRotation for sparkle effect)
         float[] starColor = {1f, 0.9f, 0.3f, starPulse};
 
-        // Star 1
-        Cube star1 = new Cube(x - PLAYER_SIZE * 0.2f, y + PLAYER_SIZE * 1.7f + bobAmount, z + PLAYER_SIZE * 0.35f);
+        Cube star1 = new Cube(x - PLAYER_SIZE * 0.2f, y + PLAYER_SIZE * 1.7f + bobAmount, z - PLAYER_SIZE * 0.35f);
         star1.size = PLAYER_SIZE * 0.12f;
         star1.modelRotationX = time * 80f;
-        star1.drawWithRotation(vpMatrix, starColor);
+        star1.drawWithRotation(finalVPMatrix, starColor);
 
-        // Star 2
-        Cube star2 = new Cube(x + PLAYER_SIZE * 0.15f, y + PLAYER_SIZE * 2.0f + bobAmount, z + PLAYER_SIZE * 0.3f);
+        Cube star2 = new Cube(x + PLAYER_SIZE * 0.15f, y + PLAYER_SIZE * 2.0f + bobAmount, z - PLAYER_SIZE * 0.3f);
         star2.size = PLAYER_SIZE * 0.1f;
         star2.modelRotationX = -time * 100f;
-        star2.drawWithRotation(vpMatrix, starColor);
+        star2.drawWithRotation(finalVPMatrix, starColor);
 
-        // Star 3 (on tip)
-        Cube star3 = new Cube(x, y + PLAYER_SIZE * 2.35f + bobAmount, z + PLAYER_SIZE * 0.2f);
+        Cube star3 = new Cube(x, y + PLAYER_SIZE * 2.35f + bobAmount, z - PLAYER_SIZE * 0.2f);
         star3.size = PLAYER_SIZE * 0.08f;
         star3.modelRotationX = time * 120f;
-        star3.drawWithRotation(vpMatrix, starColor);
+        star3.drawWithRotation(finalVPMatrix, starColor);
+    }
+
+    private void drawPart(float[] parentMatrix, float localX, float localY, float localZ, float size, float[] color) {
+        float[] modelMatrix = new float[16];
+        float[] mvpMatrix = new float[16];
+
+        android.opengl.Matrix.setIdentityM(modelMatrix, 0);
+        android.opengl.Matrix.translateM(modelMatrix, 0, localX, localY, localZ);
+        android.opengl.Matrix.scaleM(modelMatrix, 0, size, size, size);
+
+        android.opengl.Matrix.multiplyMM(mvpMatrix, 0, parentMatrix, 0, modelMatrix, 0);
+
+        if (ShaderHelper.program == -1) return;
+        GLES20.glUseProgram(ShaderHelper.program);
+        GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
+
+        java.nio.FloatBuffer buffer = Cube.getStaticVertexBuffer();
+        buffer.position(0);
+        GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+        GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3, GLES20.GL_FLOAT, false, 0, buffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
+        GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
     }
 }

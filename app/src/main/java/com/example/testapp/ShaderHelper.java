@@ -6,24 +6,45 @@ import android.util.Log;
 public class ShaderHelper {
     private static final String TAG = "ShaderHelper";
 
+    // ============================================================
+    // NEW SHADERS — supports normals and soft lighting
+    // ============================================================
+
     private static final String VERTEX_SHADER =
             "uniform mat4 uMVPMatrix;\n" +
-                    "attribute vec4 aPosition;\n" +
+                    "attribute vec3 aPosition;\n" +
+                    "attribute vec3 aNormal;\n" +
+                    "varying vec3 vNormal;\n" +
                     "void main() {\n" +
-                    "  gl_Position = uMVPMatrix * aPosition;\n" +
+                    "    vNormal = aNormal;\n" +
+                    "    gl_Position = uMVPMatrix * vec4(aPosition, 1.0);\n" +
                     "}\n";
 
     private static final String FRAGMENT_SHADER =
             "precision mediump float;\n" +
                     "uniform vec4 uColor;\n" +
+                    "varying vec3 vNormal;\n" +
                     "void main() {\n" +
-                    "  gl_FragColor = uColor;\n" +
+                    "    // Soft directional light from above/front\n" +
+                    "    vec3 lightDir = normalize(vec3(0.2, 0.7, 1.0));\n" +
+                    "    float light = dot(normalize(vNormal), lightDir);\n" +
+                    "    light = clamp(light * 0.5 + 0.5, 0.0, 1.0);\n" +
+                    "    gl_FragColor = vec4(uColor.rgb * light, uColor.a);\n" +
                     "}\n";
 
+    // ============================================================
+
     public static int program = -1;
+
+    // Vertex attrs
     public static int aPositionHandle = -1;
+    public static int aNormalHandle = -1;
+
+    // Uniforms
     public static int uMVPMatrixHandle = -1;
     public static int uColorHandle = -1;
+
+    // ============================================================
 
     public static void init() {
         if (program != -1) return; // already created
@@ -41,8 +62,9 @@ public class ShaderHelper {
         GLES20.glAttachShader(program, fs);
         GLES20.glLinkProgram(program);
 
-        final int[] linkStatus = new int[1];
+        int[] linkStatus = new int[1];
         GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0);
+
         if (linkStatus[0] == 0) {
             Log.e(TAG, "Error linking program: " + GLES20.glGetProgramInfoLog(program));
             GLES20.glDeleteProgram(program);
@@ -50,11 +72,13 @@ public class ShaderHelper {
             return;
         }
 
+        // ---- GET ALL HANDLES ----
         aPositionHandle = GLES20.glGetAttribLocation(program, "aPosition");
+        aNormalHandle = GLES20.glGetAttribLocation(program, "aNormal");
         uMVPMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix");
         uColorHandle = GLES20.glGetUniformLocation(program, "uColor");
 
-        // Clean up shaders after linking
+        // Clean up after linking
         GLES20.glDeleteShader(vs);
         GLES20.glDeleteShader(fs);
     }
@@ -64,6 +88,7 @@ public class ShaderHelper {
             GLES20.glDeleteProgram(program);
             program = -1;
             aPositionHandle = -1;
+            aNormalHandle = -1;
             uMVPMatrixHandle = -1;
             uColorHandle = -1;
         }
@@ -74,10 +99,12 @@ public class ShaderHelper {
         GLES20.glShaderSource(shader, shaderCode);
         GLES20.glCompileShader(shader);
 
-        final int[] compileStatus = new int[1];
+        int[] compileStatus = new int[1];
         GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compileStatus, 0);
+
         if (compileStatus[0] == 0) {
-            Log.e(TAG, "Error compiling shader: " + GLES20.glGetShaderInfoLog(shader));
+            Log.e(TAG, "Shader compile error: " +
+                    GLES20.glGetShaderInfoLog(shader));
             GLES20.glDeleteShader(shader);
             return 0;
         }

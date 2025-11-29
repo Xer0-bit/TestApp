@@ -251,26 +251,4 @@ public class Player {
         star3.drawWithRotation(finalVPMatrix, starColor);
     }
 
-    private void drawPart(float[] parentMatrix, float localX, float localY, float localZ, float size, float[] color) {
-        float[] modelMatrix = new float[16];
-        float[] mvpMatrix = new float[16];
-
-        android.opengl.Matrix.setIdentityM(modelMatrix, 0);
-        android.opengl.Matrix.translateM(modelMatrix, 0, localX, localY, localZ);
-        android.opengl.Matrix.scaleM(modelMatrix, 0, size, size, size);
-
-        android.opengl.Matrix.multiplyMM(mvpMatrix, 0, parentMatrix, 0, modelMatrix, 0);
-
-        if (ShaderHelper.program == -1) return;
-        GLES20.glUseProgram(ShaderHelper.program);
-        GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
-        GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, color, 0);
-
-        java.nio.FloatBuffer buffer = Cube.getStaticVertexBuffer();
-        buffer.position(0);
-        GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
-        GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, 3, GLES20.GL_FLOAT, false, 0, buffer);
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 36);
-        GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
-    }
 }

@@ -375,7 +375,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             Matrix.rotateM(worldTransform, 0, book.tiltAngle, 1f, 0f, 0f);  // tilt around X
 
             // Opening angle (pages/covers rotate around the vertical spine -> Y axis)
-            float openAngle = 40f + pageTurnAngle;
+            float openAngle = -(40f + pageTurnAngle);
 
             // --- SPINE (center cube) ---
             float[] spineLocal = new float[16];
@@ -387,7 +387,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
             // Helper pivot distances:
             // spineFace = distance from spine center to the outer face where pages hinge
-            float spineFace = spineWidth * 0.5f;
+            float spineFace = 0f;
             // pageCenterFromSpine = from spine face to page center
             float pageCenterFromSpine = (bookWidth * 0.5f);
 
@@ -414,17 +414,18 @@ public class GameRenderer implements GLSurfaceView.Renderer {
                 cube.drawWithModel(vpMatrix, leftPageModel, book.pageColor);
             }
 
-            // === LEFT COVER (same hinge as page, opens slightly more) ===
+            // === LEFT COVER (positioned at outer edge of pages) ===
             {
                 float[] leftCoverLocal = new float[16];
                 Matrix.setIdentityM(leftCoverLocal, 0);
                 Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -spineFace);
-                Matrix.rotateM(leftCoverLocal, 0, -(openAngle + 5f), 0f, 1f, 0f); // rotate around Y
-                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -pageCenterFromSpine);
+                Matrix.rotateM(leftCoverLocal, 0, -(openAngle + 5f), 0f, 1f, 0f);
+                // Move to outer edge: page center distance + half page width + half cover width
+                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -(pageCenterFromSpine + bookWidth * 0.5f));
                 Matrix.scaleM(leftCoverLocal, 0, coverThickness, bookHeight, bookWidth);
 
                 float[] leftCoverModel = new float[16];
-                Matrix.multiplyMM(leftCoverModel, 0, worldTransform, 0, leftCoverLocal, 0);
+                Matrix.multiplyMM(leftCoverModel, 0, worldTransform, 0, leftCoverModel, 0);
                 cube.drawWithModel(vpMatrix, leftCoverModel, book.coverColor);
             }
 
@@ -456,11 +457,12 @@ public class GameRenderer implements GLSurfaceView.Renderer {
                 Matrix.setIdentityM(rightCoverLocal, 0);
                 Matrix.translateM(rightCoverLocal, 0, 0f, 0f, spineFace);
                 Matrix.rotateM(rightCoverLocal, 0, openAngle + 5f, 0f, 1f, 0f);
-                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, pageCenterFromSpine);
+                // Move to outer edge: page center distance + half page width + half cover width
+                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, (pageCenterFromSpine + bookWidth * 0.5f));
                 Matrix.scaleM(rightCoverLocal, 0, coverThickness, bookHeight, bookWidth);
 
                 float[] rightCoverModel = new float[16];
-                Matrix.multiplyMM(rightCoverModel, 0, worldTransform, 0, rightCoverLocal, 0);
+                Matrix.multiplyMM(rightCoverModel, 0, worldTransform, 0, rightCoverModel, 0);
                 cube.drawWithModel(vpMatrix, rightCoverModel, book.coverColor);
             }
 

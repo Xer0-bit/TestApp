@@ -349,7 +349,7 @@ public class GameRenderer implements GLSurfaceView.Renderer {
         Cube cube = new Cube(0, 0, 0);
 
         for (MagicalBook book : floatingBooks) {
-            // --- world/animation ---
+            // Calculate animated position
             float angle = animTime * book.orbitSpeed + book.bobOffset;
             float bookX = book.x + (float) Math.cos(angle) * book.orbitRadius * 0.5f;
             float bookY = book.y + (float) Math.sin(animTime * book.bobSpeed + book.bobOffset) * 0.4f;
@@ -359,223 +359,152 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             float currentRotation = animTime * book.spinSpeed;
             float pageTurnAngle = (float) Math.sin(animTime * book.pageFlipSpeed) * 15f;
 
-            // dimensions (Cube scale order: X=thickness, Y=height, Z=width)
+            // Book dimensions
             float bookHeight = bookSize * 1.4f;
             float bookWidth = bookSize * 1.2f;
             float bookThickness = bookSize * 0.15f;
             float coverThickness = bookSize * 0.02f;
-            float spineWidth = bookSize * 0.03f;   // thickness along Z for the small spine block
+            float spineWidth = bookSize * 0.03f;
             float pageThickness = bookSize * 0.08f;
-
-            // === IMPORTANT: use half-widths so pieces don't overlap ===
             float pageWidth = bookWidth * 0.5f;
-            float coverWidth = bookWidth * 0.5f;
             float halfSpine = spineWidth * 0.5f;
 
-            // === world transform (position + spin + tilt) ===
+            // World transform
             float[] worldTransform = new float[16];
             Matrix.setIdentityM(worldTransform, 0);
             Matrix.translateM(worldTransform, 0, bookX, bookY, bookZ);
-            Matrix.rotateM(worldTransform, 0, currentRotation, 0f, 1f, 0f); // spin around Y
-            Matrix.rotateM(worldTransform, 0, book.tiltAngle, 1f, 0f, 0f);  // tilt around X
+            Matrix.rotateM(worldTransform, 0, currentRotation, 0f, 1f, 0f);
+            Matrix.rotateM(worldTransform, 0, book.tiltAngle, 1f, 0f, 0f);
 
-            // Opening angle (pages/covers rotate around the vertical spine -> Y axis)
             float openAngle = -(40f + pageTurnAngle);
-
-            // --- SPINE (center cube) ---
-            float[] spineLocal = new float[16];
-            Matrix.setIdentityM(spineLocal, 0);
-            Matrix.scaleM(spineLocal, 0, bookThickness, bookHeight, spineWidth);
-            float[] spineModel = new float[16];
-            Matrix.multiplyMM(spineModel, 0, worldTransform, 0, spineLocal, 0);
-            cube.drawWithModel(vpMatrix, spineModel, book.coverColor);
-
-            // Helper pivot distances:
-            // spineFace = distance from spine center to the outer face where pages hinge
-            float spineFace = halfSpine;
-            // pageCenterFromSpine = from spine face to page center (half the page width)
             float pageCenterFromSpine = pageWidth * 0.5f;
+            float coverOffset = (pageThickness + coverThickness) * 0.5f;
 
-            // === LEFT PAGE (hinge at left spine face, rotate around Y) ===
-            {
-                float[] leftPageLocal = new float[16];
-                Matrix.setIdentityM(leftPageLocal, 0);
+            // Draw spine
+            cube.drawWithModel(vpMatrix,
+                    createBookPieceTransform(worldTransform, 0, 0, 0, 0, bookThickness, bookHeight, spineWidth),
+                    book.coverColor);
 
-                // 1) translate so hinge is at the origin for rotation (move local origin to spine face)
-                Matrix.translateM(leftPageLocal, 0, 0f, 0f, -spineFace);
+            // Draw left page
+            cube.drawWithModel(vpMatrix,
+                    createBookPieceTransform(worldTransform, -halfSpine, -openAngle, -pageCenterFromSpine, 0,
+                            pageThickness, bookHeight * 0.96f, pageWidth),
+                    book.pageColor);
 
-                // 2) rotate around Y (vertical hinge) - left side rotates negative around Y
-                Matrix.rotateM(leftPageLocal, 0, -openAngle, 0f, 1f, 0f);
+            // Draw left cover
+            cube.drawWithModel(vpMatrix,
+                    createBookPieceTransform(worldTransform, -halfSpine, -openAngle, -pageCenterFromSpine, coverOffset,
+                            coverThickness, bookHeight, pageWidth * 1.25f),
+                    book.coverColor);
 
-                // 3) after rotating, move outward so the page center is positioned correctly:
-                //    move by -pageCenterFromSpine (because left is negative Z in our coordinate choice)
-                Matrix.translateM(leftPageLocal, 0, 0f, 0f, -pageCenterFromSpine);
+            // Draw right page
+            cube.drawWithModel(vpMatrix,
+                    createBookPieceTransform(worldTransform, halfSpine, openAngle, pageCenterFromSpine, 0,
+                            pageThickness, bookHeight * 0.96f, pageWidth),
+                    book.pageColor);
 
-                // 4) scale to page dimensions (X = thickness, Y = height, Z = pageWidth)
-                Matrix.scaleM(leftPageLocal, 0, pageThickness, bookHeight * 0.96f, pageWidth);
+            // Draw right cover
+            cube.drawWithModel(vpMatrix,
+                    createBookPieceTransform(worldTransform, halfSpine, openAngle, pageCenterFromSpine, coverOffset,
+                            coverThickness, bookHeight, pageWidth * 1.25f),
+                    book.coverColor);
 
-                float[] leftPageModel = new float[16];
-                Matrix.multiplyMM(leftPageModel, 0, worldTransform, 0, leftPageLocal, 0);
-                cube.drawWithModel(vpMatrix, leftPageModel, book.pageColor);
+            // Draw magical effects
+            drawBookEffect(cube, vpMatrix, worldTransform, book, bookHeight, bookSize,
+                    halfSpine, coverThickness, openAngle);
+        }
+    }
+
+    private float[] createBookPieceTransform(float[] worldTransform, float hingeZ, float rotAngle,
+                                             float outwardZ, float outwardX, float thicknessX,
+                                             float height, float widthZ) {
+        float[] local = new float[16];
+        Matrix.setIdentityM(local, 0);
+        Matrix.translateM(local, 0, 0f, 0f, hingeZ);
+        Matrix.rotateM(local, 0, rotAngle, 0f, 1f, 0f);
+        Matrix.translateM(local, 0, outwardX, 0f, outwardZ);
+        Matrix.scaleM(local, 0, thicknessX, height, widthZ);
+        float[] model = new float[16];
+        Matrix.multiplyMM(model, 0, worldTransform, 0, local, 0);
+        return model;
+    }
+
+    private void drawBookEffect(Cube cube, float[] vpMatrix, float[] worldTransform,
+                                MagicalBook book, float bookHeight, float bookSize,
+                                float halfSpine, float coverThickness, float openAngle) {
+        float glowPulse = (float) Math.sin(animTime * 3f + book.bobOffset) * 0.3f + 0.7f;
+
+        switch (book.bookStyle) {
+            case 0:
+                drawRunes(cube, vpMatrix, worldTransform, bookHeight, bookSize,
+                        halfSpine, coverThickness, openAngle, glowPulse);
+                break;
+            case 1:
+                drawOrbitingParticles(cube, vpMatrix, worldTransform, bookSize, glowPulse);
+                break;
+            case 2:
+                drawHelixSparkles(cube, vpMatrix, worldTransform, bookSize, bookHeight, glowPulse);
+                break;
+        }
+    }
+
+    private void drawRunes(Cube cube, float[] vpMatrix, float[] worldTransform,
+                           float bookHeight, float bookSize, float halfSpine,
+                           float coverThickness, float openAngle, float glowPulse) {
+        float[] runeColor = {0.9f, 0.75f, 0.2f, 0.7f * glowPulse};
+        float[] positions = {-halfSpine - coverThickness * 0.5f, halfSpine + coverThickness * 0.5f};
+        float[] rotations = {-(openAngle + 5f), openAngle + 5f};
+
+        for (int side = 0; side < 2; side++) {
+            for (int i = 0; i < 3; i++) {
+                float runeY = (i - 1) * bookHeight * 0.35f;
+                float[] local = new float[16];
+                Matrix.setIdentityM(local, 0);
+                Matrix.translateM(local, 0, 0f, runeY, positions[side]);
+                Matrix.rotateM(local, 0, rotations[side], 0f, 1f, 0f);
+                Matrix.scaleM(local, 0, coverThickness * 0.3f, bookSize * 0.15f, bookSize * 0.15f);
+                float[] model = new float[16];
+                Matrix.multiplyMM(model, 0, worldTransform, 0, local, 0);
+                cube.drawWithModel(vpMatrix, model, runeColor);
             }
+        }
+    }
 
-            // === LEFT COVER (attached to back of left page) ===
-            {
-                float[] leftCoverLocal = new float[16];
-                Matrix.setIdentityM(leftCoverLocal, 0);
+    private void drawOrbitingParticles(Cube cube, float[] vpMatrix, float[] worldTransform,
+                                       float bookSize, float glowPulse) {
+        float[] color = {0.4f, 0.6f, 1f, 0.8f * glowPulse};
+        for (int i = 0; i < 4; i++) {
+            float angle = animTime * 2f + i * (6.28f / 4);
+            float px = (float) Math.cos(angle) * bookSize * 0.8f;
+            float pz = (float) Math.sin(angle) * bookSize * 0.8f;
 
-                // 1. Move pivot to left spine face (same as page)
-                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -spineFace);
+            float[] local = new float[16];
+            Matrix.setIdentityM(local, 0);
+            Matrix.translateM(local, 0, px, 0f, pz);
+            Matrix.scaleM(local, 0, bookSize * 0.08f, bookSize * 0.08f, bookSize * 0.08f);
+            float[] model = new float[16];
+            Matrix.multiplyMM(model, 0, worldTransform, 0, local, 0);
+            cube.drawWithModel(vpMatrix, model, color);
+        }
+    }
 
-                // 2. Rotate same as page
-                Matrix.rotateM(leftCoverLocal, 0, -openAngle, 0f, 1f, 0f);
+    private void drawHelixSparkles(Cube cube, float[] vpMatrix, float[] worldTransform,
+                                   float bookSize, float bookHeight, float glowPulse) {
+        float[] sparkleColor = {1f, 0.8f, 0.3f, 0.9f * glowPulse};
+        for (int i = 0; i < 6; i++) {
+            float angle = animTime * 2.5f + i * (3.14159f / 3f);
+            float px = (float) Math.cos(angle) * bookSize * 0.7f;
+            float py = (float) Math.sin(animTime * 1.5f + i) * bookHeight * 0.3f;
+            float pz = (float) Math.sin(angle) * bookSize * 0.7f;
 
-                // 3. Move to page center position first
-                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -pageCenterFromSpine);
-
-                // 4. Then move outward from page center to attach cover to back of page
-                //    Move by: half page thickness + half cover thickness
-                float coverOffset = (pageThickness + coverThickness) * 0.5f;
-                Matrix.translateM(leftCoverLocal, 0, coverOffset, 0f, 0f);  // FLIPPED SIGN
-
-                // 5. Scale into a cover (slightly larger than page)
-                Matrix.scaleM(leftCoverLocal, 0, coverThickness, bookHeight, pageWidth * 1.25f);
-
-                float[] leftCoverModel = new float[16];
-                Matrix.multiplyMM(leftCoverModel, 0, worldTransform, 0, leftCoverLocal, 0);
-                cube.drawWithModel(vpMatrix, leftCoverModel, book.coverColor);
-            }
-
-            // === RIGHT PAGE (hinge at right spine face on +Z) ===
-            {
-                float[] rightPageLocal = new float[16];
-                Matrix.setIdentityM(rightPageLocal, 0);
-
-                // hinge: move to +spineFace
-                Matrix.translateM(rightPageLocal, 0, 0f, 0f, spineFace);
-
-                // rotate around Y (opposite direction for right side)
-                Matrix.rotateM(rightPageLocal, 0, openAngle, 0f, 1f, 0f);
-
-                // move outward to page center (positive Z)
-                Matrix.translateM(rightPageLocal, 0, 0f, 0f, pageCenterFromSpine);
-
-                // scale same as left page (Z = pageWidth)
-                Matrix.scaleM(rightPageLocal, 0, pageThickness, bookHeight * 0.96f, pageWidth);
-
-                float[] rightPageModel = new float[16];
-                Matrix.multiplyMM(rightPageModel, 0, worldTransform, 0, rightPageLocal, 0);
-                cube.drawWithModel(vpMatrix, rightPageModel, book.pageColor);
-            }
-
-            // === RIGHT COVER (attached to back of right page) ===
-            {
-                float[] rightCoverLocal = new float[16];
-                Matrix.setIdentityM(rightCoverLocal, 0);
-
-                // 1. Move pivot to right spine face (same as page)
-                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, spineFace);
-
-                // 2. Rotate same as page
-                Matrix.rotateM(rightCoverLocal, 0, openAngle, 0f, 1f, 0f);
-
-                // 3. Move to page center position first
-                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, pageCenterFromSpine);
-
-                // 4. Then move outward from page center to attach cover to back of page
-                //    Move by: half page thickness + half cover thickness
-                float coverOffset = (pageThickness + coverThickness) * 0.5f;
-                Matrix.translateM(rightCoverLocal, 0, coverOffset, 0f, 0f);
-
-                // 5. Scale into a cover (slightly larger than page)
-                Matrix.scaleM(rightCoverLocal, 0, coverThickness, bookHeight, pageWidth * 1.25f);
-
-                float[] rightCoverModel = new float[16];
-                Matrix.multiplyMM(rightCoverModel, 0, worldTransform, 0, rightCoverLocal, 0);
-                cube.drawWithModel(vpMatrix, rightCoverModel, book.coverColor);
-            }
-
-            // === MAGICAL EFFECTS (placed relative to worldTransform) ===
-            float glowPulse = (float) Math.sin(animTime * 3f + book.bobOffset) * 0.3f + 0.7f;
-            switch (book.bookStyle) {
-                case 0: {
-                    // Ancient runes on covers
-                    float[] runeColor = {0.9f, 0.75f, 0.2f, 0.7f * glowPulse};
-                    for (int i = 0; i < 3; i++) {
-                        float runeY = (i - 1) * bookHeight * 0.35f;
-
-                        float[] runeLocal = new float[16];
-                        Matrix.setIdentityM(runeLocal, 0);
-
-                        // place runes on left cover
-                        Matrix.translateM(runeLocal, 0, 0f, runeY, -spineFace - (coverThickness * 0.5f));
-                        Matrix.rotateM(runeLocal, 0, -(openAngle + 5f), 0f, 1f, 0f);
-                        Matrix.scaleM(runeLocal, 0, coverThickness * 0.3f, bookSize * 0.15f, bookSize * 0.15f);
-
-                        float[] runeModel = new float[16];
-                        Matrix.multiplyMM(runeModel, 0, worldTransform, 0, runeLocal, 0);
-                        cube.drawWithModel(vpMatrix, runeModel, runeColor);
-                    }
-
-                    for (int i = 0; i < 3; i++) {
-                        float runeY = (i - 1) * bookHeight * 0.35f;
-
-                        float[] runeLocal = new float[16];
-                        Matrix.setIdentityM(runeLocal, 0);
-                        Matrix.translateM(runeLocal, 0, 0f, runeY, spineFace + (coverThickness * 0.5f));
-                        Matrix.rotateM(runeLocal, 0, openAngle + 5f, 0f, 1f, 0f);
-                        Matrix.scaleM(runeLocal, 0, coverThickness * 0.3f, bookSize * 0.15f, bookSize * 0.15f);
-
-                        float[] runeModel = new float[16];
-                        Matrix.multiplyMM(runeModel, 0, worldTransform, 0, runeLocal, 0);
-                        cube.drawWithModel(vpMatrix, runeModel, runeColor);
-                    }
-                    break;
-                }
-                case 1: {
-                    // Mystical orbiting particles
-                    float[] particleColor = {0.4f, 0.6f, 1f, 0.8f * glowPulse};
-                    for (int i = 0; i < 4; i++) {
-                        float particleAngle = animTime * 2f + i * (3.14159f * 0.5f);
-                        float particleRadius = bookSize * 0.8f;
-                        float px = (float) Math.cos(particleAngle) * particleRadius;
-                        float pz = (float) Math.sin(particleAngle) * particleRadius;
-
-                        float[] particleLocal = new float[16];
-                        Matrix.setIdentityM(particleLocal, 0);
-                        Matrix.translateM(particleLocal, 0, px, 0f, pz);
-                        Matrix.scaleM(particleLocal, 0, bookSize * 0.08f, bookSize * 0.08f, bookSize * 0.08f);
-
-                        float[] particleModel = new float[16];
-                        Matrix.multiplyMM(particleModel, 0, worldTransform, 0, particleLocal, 0);
-                        cube.drawWithModel(vpMatrix, particleModel, particleColor);
-                    }
-                    break;
-                }
-                case 2: {
-                    // Golden sparkles orbiting the book
-                    float[] sparkleColor = {1f, 0.8f, 0.3f, 0.9f * glowPulse};
-                    for (int i = 0; i < 6; i++) {
-                        float sparkleAngle = animTime * 2.5f + i * (3.14159f / 3f);
-                        float sparkleRadius = bookSize * 0.7f;
-                        float sparkleHeight = (float) Math.sin(animTime * 1.5f + i) * bookHeight * 0.3f;
-                        float px = (float) Math.cos(sparkleAngle) * sparkleRadius;
-                        float py = sparkleHeight;
-                        float pz = (float) Math.sin(sparkleAngle) * sparkleRadius;
-
-                        float[] sparkleLocal = new float[16];
-                        Matrix.setIdentityM(sparkleLocal, 0);
-                        Matrix.translateM(sparkleLocal, 0, px, py, pz);
-                        Matrix.rotateM(sparkleLocal, 0, animTime * 100f + i * 60f, 0f, 1f, 0f);
-                        Matrix.scaleM(sparkleLocal, 0, bookSize * 0.05f, bookSize * 0.05f, bookSize * 0.05f);
-
-                        float[] sparkleModel = new float[16];
-                        Matrix.multiplyMM(sparkleModel, 0, worldTransform, 0, sparkleLocal, 0);
-                        cube.drawWithModel(vpMatrix, sparkleModel, sparkleColor);
-                    }
-                    break;
-                }
-            }
+            float[] local = new float[16];
+            Matrix.setIdentityM(local, 0);
+            Matrix.translateM(local, 0, px, py, pz);
+            Matrix.rotateM(local, 0, animTime * 100f + i * 60f, 0f, 1f, 0f);
+            Matrix.scaleM(local, 0, bookSize * 0.05f, bookSize * 0.05f, bookSize * 0.05f);
+            float[] model = new float[16];
+            Matrix.multiplyMM(model, 0, worldTransform, 0, local, 0);
+            cube.drawWithModel(vpMatrix, model, sparkleColor);
         }
     }
 

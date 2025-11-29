@@ -114,6 +114,26 @@ public class Cube {
         GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
     }
 
+    // Add this method to Cube.java, right after drawWithRotation():
+
+    public void drawWithModel(float[] vpMatrix, float[] modelMatrix, float[] colorRGBA) {
+        if (ShaderHelper.program == -1) return;
+        GLES20.glUseProgram(ShaderHelper.program);
+
+        float[] mvpMatrix = new float[16];
+        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+
+        GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, colorRGBA, 0);
+
+        vertexBuffer.position(0);
+        GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+        GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
+                GLES20.GL_FLOAT, false, 0, vertexBuffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, VERTEX_COUNT);
+        GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
+    }
+
     public void drawCustomScale(float[] vpMatrix, float[] colorRGBA, float scaleX, float scaleY, float scaleZ) {
         if (ShaderHelper.program == -1) return;
         GLES20.glUseProgram(ShaderHelper.program);

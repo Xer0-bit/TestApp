@@ -12,7 +12,6 @@ public class Cube {
     private static final int COORDS_PER_VERTEX = 3;
     private static final int VERTEX_COUNT = 36; // 12 triangles * 3 vertices
     private static final float GLASS_THICKNESS = 0.05f;
-
     // 36 vertices (12 triangles) * 3 coords
     private static final float[] VERTICES = {
             // front
@@ -62,9 +61,11 @@ public class Cube {
         return vertexBuffer;
     }
 
+
     public void draw(float[] vpMatrix, float[] colorRGBA) {
         if (ShaderHelper.program == -1) return;
         GLES20.glUseProgram(ShaderHelper.program);
+
 
         // Build model matrix
         Matrix.setIdentityM(modelMatrix, 0);
@@ -112,4 +113,25 @@ public class Cube {
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, VERTEX_COUNT);
         GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
     }
+
+    public void drawCustomScale(float[] vpMatrix, float[] colorRGBA, float scaleX, float scaleY, float scaleZ) {
+        if (ShaderHelper.program == -1) return;
+        GLES20.glUseProgram(ShaderHelper.program);
+
+        Matrix.setIdentityM(modelMatrix, 0);
+        Matrix.translateM(modelMatrix, 0, x, y, z);
+        Matrix.scaleM(modelMatrix, 0, scaleX, scaleY, scaleZ); // Use custom scale!
+        Matrix.multiplyMM(mvpMatrix, 0, vpMatrix, 0, modelMatrix, 0);
+
+        GLES20.glUniformMatrix4fv(ShaderHelper.uMVPMatrixHandle, 1, false, mvpMatrix, 0);
+        GLES20.glUniform4fv(ShaderHelper.uColorHandle, 1, colorRGBA, 0);
+
+        vertexBuffer.position(0);
+        GLES20.glEnableVertexAttribArray(ShaderHelper.aPositionHandle);
+        GLES20.glVertexAttribPointer(ShaderHelper.aPositionHandle, COORDS_PER_VERTEX,
+                GLES20.GL_FLOAT, false, 0, vertexBuffer);
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, VERTEX_COUNT);
+        GLES20.glDisableVertexAttribArray(ShaderHelper.aPositionHandle);
+    }
+
 }

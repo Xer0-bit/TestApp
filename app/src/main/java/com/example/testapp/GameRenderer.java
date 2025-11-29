@@ -8,6 +8,8 @@ import android.os.SystemClock;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
+
+import java.nio.FloatBuffer;
 import java.util.Random;
 
 public class GameRenderer implements GLSurfaceView.Renderer {
@@ -300,30 +302,63 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
     private void drawFloatingBooks(float[] vpMatrix) {
         for (MagicalBook book : floatingBooks) {
-            // Calculate orbital position
+            // Position + orbit
             float angle = animTime * book.orbitSpeed + book.bobOffset;
             float bookX = book.x + (float) Math.cos(angle) * book.orbitRadius * 0.5f;
             float bookY = book.y + (float) Math.sin(animTime * book.bobSpeed + book.bobOffset) * 0.4f;
             float bookZ = book.z + (float) Math.sin(angle * 0.6f) * book.orbitRadius * 0.5f;
 
-            // Magical glow around books
-            float pulse = (float) Math.sin(animTime * 2f + book.bobOffset) * 0.2f + 0.8f;
+            float bookSize = book.size;
 
-            // Aged book colors
-            float[] bookColor = {0.4f, 0.3f, 0.2f, 0.85f}; // Brown leather
-            float[] glowColor = {0.7f, 0.6f, 0.9f, 0.4f * pulse}; // Purple magical aura
+            // Colors
+            float[] spineColor = {0.25f, 0.15f, 0.08f, 0.95f}; // Dark wood spine
+            float[] pageColor = {0.95f, 0.9f, 0.8f, 0.95f};     // Aged parchment
+            float[] coverColor = {0.25f, 0.15f, 0.08f, 0.95f};   // Leather cover (same as spine)
 
-            // Book with rotation
-            Cube bookCube = new Cube(bookX, bookY, bookZ);
-            bookCube.size = book.size;
-            bookCube.modelRotationX = book.rotationAngle + animTime * 20f;
-            bookCube.drawWithRotation(vpMatrix, bookColor);
+            // Dimensions
+            float spineWidth = bookSize * 0.15f;   // X (thickness)
+            float spineHeight = bookSize * 1.3f;   // Y (height)
+            float spineDepth = bookSize * 0.08f;   // Z (depth)
 
-            // Magical aura
-            Cube aura = new Cube(bookX, bookY, bookZ);
-            aura.size = book.size * 1.3f;
-            aura.modelRotationX = -book.rotationAngle - animTime * 15f;
-            aura.drawWithRotation(vpMatrix, glowColor);
+            float pageThickness = bookSize * 0.05f; // X (thickness)
+            float pageHeight = bookSize * 1.1f;     // Y (height)
+            float pageWidth = bookSize * 0.7f;      // Z (width)
+
+            // === SPINE (left edge) ===
+            Cube spine = new Cube(bookX, bookY, bookZ);
+            spine.drawCustomScale(vpMatrix, spineColor, spineWidth, spineHeight, spineDepth);
+
+            // === LEFT PAGE BLOCK ===
+            float leftPageX = bookX + spineWidth * 0.5f + pageThickness * 0.5f;
+            Cube leftPage = new Cube(leftPageX, bookY, bookZ);
+            leftPage.drawCustomScale(vpMatrix, pageColor, pageThickness, pageHeight, pageWidth);
+
+            // === RIGHT PAGE BLOCK ===
+            float rightPageX = bookX - spineWidth * 0.5f - pageThickness * 0.5f;
+            Cube rightPage = new Cube(rightPageX, bookY, bookZ);
+            rightPage.drawCustomScale(vpMatrix, pageColor, pageThickness, pageHeight, pageWidth);
+
+            // === LEATHER COVERS (same color as spine, open) ===
+            float coverThickness = bookSize * 0.03f;
+            float coverHeight = bookSize * 1.1f;
+            float coverWidth = bookSize * 0.7f;
+
+            // Left cover (attached to left page)
+            float leftCoverX = leftPageX + pageThickness * 0.5f + coverThickness * 0.5f;
+            Cube leftCover = new Cube(leftCoverX, bookY, bookZ);
+            leftCover.drawCustomScale(vpMatrix, coverColor, coverThickness, coverHeight, coverWidth);
+
+            // Right cover (attached to right page)
+            float rightCoverX = rightPageX - pageThickness * 0.5f - coverThickness * 0.5f;
+            Cube rightCover = new Cube(rightCoverX, bookY, bookZ);
+            rightCover.drawCustomScale(vpMatrix, coverColor, coverThickness, coverHeight, coverWidth);
+
+            // Optional: subtle golden rune on spine
+            float runePulse = (float) Math.sin(animTime * 5f) * 0.2f + 0.8f;
+            float[] runeColor = {0.95f, 0.85f, 0.2f, runePulse};
+            Cube rune = new Cube(bookX, bookY + bookSize * 0.4f, bookZ - spineDepth * 1.2f);
+            rune.size = bookSize * 0.1f;
+            rune.draw(vpMatrix, runeColor);
         }
     }
 

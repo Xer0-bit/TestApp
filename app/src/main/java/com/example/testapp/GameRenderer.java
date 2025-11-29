@@ -367,6 +367,11 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             float spineWidth = bookSize * 0.06f;   // thickness along Z for the small spine block
             float pageThickness = bookSize * 0.08f;
 
+            // === IMPORTANT: use half-widths so pieces don't overlap ===
+            float pageWidth = bookWidth * 0.5f;
+            float coverWidth = bookWidth * 0.5f;
+            float halfSpine = spineWidth * 0.5f;
+
             // === world transform (position + spin + tilt) ===
             float[] worldTransform = new float[16];
             Matrix.setIdentityM(worldTransform, 0);
@@ -387,11 +392,11 @@ public class GameRenderer implements GLSurfaceView.Renderer {
 
             // Helper pivot distances:
             // spineFace = distance from spine center to the outer face where pages hinge
-            float spineFace = 0f;
-            // pageCenterFromSpine = from spine face to page center
-            float pageCenterFromSpine = (bookWidth * 0.5f);
+            float spineFace = halfSpine;
+            // pageCenterFromSpine = from spine face to page center (half the page width)
+            float pageCenterFromSpine = pageWidth * 0.5f;
 
-            // === LEFT PAGE (hinge at spine face, rotate around Y) ===
+            // === LEFT PAGE (hinge at left spine face, rotate around Y) ===
             {
                 float[] leftPageLocal = new float[16];
                 Matrix.setIdentityM(leftPageLocal, 0);
@@ -406,30 +411,39 @@ public class GameRenderer implements GLSurfaceView.Renderer {
                 //    move by -pageCenterFromSpine (because left is negative Z in our coordinate choice)
                 Matrix.translateM(leftPageLocal, 0, 0f, 0f, -pageCenterFromSpine);
 
-                // 4) scale to page dimensions (X = thickness, Y = height, Z = width)
-                Matrix.scaleM(leftPageLocal, 0, pageThickness, bookHeight * 0.96f, bookWidth);
+                // 4) scale to page dimensions (X = thickness, Y = height, Z = pageWidth)
+                Matrix.scaleM(leftPageLocal, 0, pageThickness, bookHeight * 0.96f, pageWidth);
 
                 float[] leftPageModel = new float[16];
                 Matrix.multiplyMM(leftPageModel, 0, worldTransform, 0, leftPageLocal, 0);
                 cube.drawWithModel(vpMatrix, leftPageModel, book.pageColor);
             }
 
-            // === LEFT COVER (positioned at outer edge of pages) ===
+            // === LEFT COVER (hinged to left side of spine) ===
             {
                 float[] leftCoverLocal = new float[16];
                 Matrix.setIdentityM(leftCoverLocal, 0);
+
+                // 1. Move pivot to left spine face
                 Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -spineFace);
+
+                // 2. Rotate around hinge
                 Matrix.rotateM(leftCoverLocal, 0, -(openAngle + 5f), 0f, 1f, 0f);
-                // Move to outer edge: page center distance + half page width + half cover width
-                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -(pageCenterFromSpine + bookWidth * 0.5f));
-                Matrix.scaleM(leftCoverLocal, 0, coverThickness, bookHeight, bookWidth);
+
+                // 3. After rotation, move outward so cover center aligns with end of spine.
+                //    We must move: pageWidth (full page block) + half the cover width
+                float coverCenterOffset = pageWidth + (coverWidth * 0.5f);
+                Matrix.translateM(leftCoverLocal, 0, 0f, 0f, -coverCenterOffset);
+
+                // 4. Scale into a cover (Z = coverWidth)
+                Matrix.scaleM(leftCoverLocal, 0, coverThickness, bookHeight, coverWidth);
 
                 float[] leftCoverModel = new float[16];
-                Matrix.multiplyMM(leftCoverModel, 0, worldTransform, 0, leftCoverModel, 0);
+                Matrix.multiplyMM(leftCoverModel, 0, worldTransform, 0, leftCoverLocal, 0);
                 cube.drawWithModel(vpMatrix, leftCoverModel, book.coverColor);
             }
 
-            // === RIGHT PAGE (hinge at spine face on +Z) ===
+            // === RIGHT PAGE (hinge at right spine face on +Z) ===
             {
                 float[] rightPageLocal = new float[16];
                 Matrix.setIdentityM(rightPageLocal, 0);
@@ -443,8 +457,8 @@ public class GameRenderer implements GLSurfaceView.Renderer {
                 // move outward to page center (positive Z)
                 Matrix.translateM(rightPageLocal, 0, 0f, 0f, pageCenterFromSpine);
 
-                // scale same as left page
-                Matrix.scaleM(rightPageLocal, 0, pageThickness, bookHeight * 0.96f, bookWidth);
+                // scale same as left page (Z = pageWidth)
+                Matrix.scaleM(rightPageLocal, 0, pageThickness, bookHeight * 0.96f, pageWidth);
 
                 float[] rightPageModel = new float[16];
                 Matrix.multiplyMM(rightPageModel, 0, worldTransform, 0, rightPageLocal, 0);
@@ -455,14 +469,23 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             {
                 float[] rightCoverLocal = new float[16];
                 Matrix.setIdentityM(rightCoverLocal, 0);
+
+                // 1. Move pivot to right spine face
                 Matrix.translateM(rightCoverLocal, 0, 0f, 0f, spineFace);
+
+                // 2. Rotate around that hinge
                 Matrix.rotateM(rightCoverLocal, 0, openAngle + 5f, 0f, 1f, 0f);
-                // Move to outer edge: page center distance + half page width + half cover width
-                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, (pageCenterFromSpine + bookWidth * 0.5f));
-                Matrix.scaleM(rightCoverLocal, 0, coverThickness, bookHeight, bookWidth);
+
+                // 3. After rotation, move outward so cover center aligns with end of spine.
+                //    move: pageWidth + half cover width
+                float coverCenterOffset = pageWidth + (coverWidth * 0.5f);
+                Matrix.translateM(rightCoverLocal, 0, 0f, 0f, coverCenterOffset);
+
+                // 4. Scale into a cover
+                Matrix.scaleM(rightCoverLocal, 0, coverThickness, bookHeight, coverWidth);
 
                 float[] rightCoverModel = new float[16];
-                Matrix.multiplyMM(rightCoverModel, 0, worldTransform, 0, rightCoverModel, 0);
+                Matrix.multiplyMM(rightCoverModel, 0, worldTransform, 0, rightCoverLocal, 0);
                 cube.drawWithModel(vpMatrix, rightCoverModel, book.coverColor);
             }
 

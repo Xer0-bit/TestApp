@@ -33,32 +33,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- TIMER TEXT (shown during gameplay) -->
+    <!-- LEVEL TEXT (shown during gameplay) -->
     <TextView
-        android:id="@+id/tvTimer"
+        android:id="@+id/tvLevel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Time: 0.00"
+        android:text="Level 1"
         android:textColor="@android:color/white"
-        android:textSize="20sp"
+        android:textSize="24sp"
+        android:textStyle="bold"
         android:layout_marginTop="16dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginStart="16dp" />
-
-    <!-- BEST TIME TEXT -->
-    <TextView
-        android:id="@+id/tvBestTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Best: --"
-        android:textColor="@android:color/white"
-        android:textSize="18sp"
-        android:layout_marginTop="16dp"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginEnd="16dp"
-        android:visibility="gone" />
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- MAIN MENU OVERLAY -->
     <LinearLayout
@@ -81,6 +68,15 @@
             android:textColor="@android:color/white"
             android:textSize="32sp"
             android:textStyle="bold"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Memorize the safe path\nFail = Go back a level"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:gravity="center"
             android:layout_marginBottom="32dp" />
 
         <Button
@@ -105,6 +101,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="PAUSED"
+            android:textColor="@android:color/white"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="32dp" />
+
         <Button
             android:id="@+id/btnResume"
             android:text="Resume"
@@ -115,7 +120,7 @@
 
         <Button
             android:id="@+id/btnRestartPause"
-            android:text="Restart"
+            android:text="Restart Level"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="24sp"
@@ -144,28 +149,38 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
-            android:id="@+id/tvWinTime"
+            android:id="@+id/tvLevelComplete"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="You Won!"
-            android:textColor="@android:color/white"
-            android:textSize="32sp"
+            android:text="Level Complete!"
+            android:textColor="#4CAF50"
+            android:textSize="36sp"
             android:textStyle="bold"
-            android:layout_marginBottom="24dp"
+            android:layout_marginBottom="16dp"
             android:gravity="center" />
 
         <TextView
-            android:id="@+id/tvBestTimeWin"
+            android:id="@+id/tvHighestLevel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Best Time: --"
+            android:text="Highest Level: 1"
             android:textColor="@android:color/white"
             android:textSize="20sp"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:id="@+id/tvLevelStats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Next: 7 platforms, 3.4s memory"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:layout_marginBottom="32dp"
+            android:gravity="center" />
 
         <Button
-            android:id="@+id/btnRestartWin"
-            android:text="Play Again"
+            android:id="@+id/btnNextLevel"
+            android:text="Next Level"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="24sp"

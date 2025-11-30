@@ -14,12 +14,12 @@ public class MainActivity extends AppCompatActivity {
 
     private GameSurfaceView gameView;
     private Handler uiHandler = new Handler();
-    private TextView tvTimer;
+    private TextView tvLevel;
     private TextView tvMemoryPhase;
     private Runnable tickRunnable;
 
     private LinearLayout mainMenu, pauseMenu, winMenu;
-    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu, btnRestartWin, btnReturnMenuWin;
+    private Button btnStartGame, btnResume, btnRestartPause, btnReturnMenu, btnNextLevel, btnReturnMenuWin;
     private GameLogic logic;
 
     private boolean winMenuShown = false;
@@ -31,7 +31,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         gameView = findViewById(R.id.gameView);
-        tvTimer = findViewById(R.id.tvTimer);
+        tvLevel = findViewById(R.id.tvLevel);
         tvMemoryPhase = findViewById(R.id.tvMemoryPhase);
 
         mainMenu = findViewById(R.id.mainMenu);
@@ -42,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
         btnResume = findViewById(R.id.btnResume);
         btnRestartPause = findViewById(R.id.btnRestartPause);
         btnReturnMenu = findViewById(R.id.btnReturnMenu);
-        btnRestartWin = findViewById(R.id.btnRestartWin);
+        btnNextLevel = findViewById(R.id.btnNextLevel);
         btnReturnMenuWin = findViewById(R.id.btnReturnMenuWin);
 
         logic = gameView.getRenderer().getLogic();
@@ -68,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
             if (logic == null || isActivityDestroyed) return;
             pauseMenu.setVisibility(View.GONE);
             winMenuShown = false;
-            logic.restartGame();
+            logic.restartCurrentLevel();
         });
 
         btnReturnMenu.setOnClickListener(v -> {
@@ -79,11 +79,11 @@ public class MainActivity extends AppCompatActivity {
             winMenuShown = false;
         });
 
-        btnRestartWin.setOnClickListener(v -> {
+        btnNextLevel.setOnClickListener(v -> {
             if (logic == null || isActivityDestroyed) return;
             winMenu.setVisibility(View.GONE);
             winMenuShown = false;
-            logic.restartGame();
+            logic.restartCurrentLevel();
         });
 
         btnReturnMenuWin.setOnClickListener(v -> {
@@ -112,36 +112,46 @@ public class MainActivity extends AppCompatActivity {
         try {
             // Handle memory phase display
             if (logic.isInMemoryPhase()) {
-                tvTimer.setVisibility(View.GONE);
+                tvLevel.setVisibility(View.GONE);
                 tvMemoryPhase.setVisibility(View.VISIBLE);
 
                 long remainingMs = logic.getMemoryPhaseRemainingMs();
                 double remainingSec = remainingMs / 1000.0;
 
                 if (remainingMs > 0) {
-                    tvMemoryPhase.setText(String.format("Memorize the path!\n%.1fs", remainingSec));
+                    tvMemoryPhase.setText(String.format("Level %d\nMemorize the path!\n%.1fs",
+                            logic.getCurrentLevel(), remainingSec));
                 } else {
                     tvMemoryPhase.setText("Get ready...");
                 }
             } else {
                 tvMemoryPhase.setVisibility(View.GONE);
-                tvTimer.setVisibility(View.VISIBLE);
+                tvLevel.setVisibility(View.VISIBLE);
 
-                double elapsed = logic.getElapsedSeconds();
-                tvTimer.setText(String.format("Time: %.2fs", elapsed));
+                tvLevel.setText(String.format("Level %d", logic.getCurrentLevel()));
             }
 
             // Show win menu only once
             if (logic.isGameWon() && !winMenuShown) {
                 winMenuShown = true;
                 winMenu.setVisibility(View.VISIBLE);
-                double elapsed = logic.getElapsedSeconds();
-                double bestTime = logic.getBestTime();
-                TextView tvWinTime = findViewById(R.id.tvWinTime);
-                TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);
-                if (tvWinTime != null && tvBestTimeWin != null) {
-                    tvWinTime.setText(String.format("You Won!\nTime: %.2fs", elapsed));
-                    tvBestTimeWin.setText(String.format("Best Time: %.2fs", bestTime));
+
+                int currentLevel = logic.getCurrentLevel();
+                int highestLevel = logic.getHighestLevelReached();
+
+                TextView tvLevelComplete = findViewById(R.id.tvLevelComplete);
+                TextView tvHighestLevel = findViewById(R.id.tvHighestLevel);
+                TextView tvLevelStats = findViewById(R.id.tvLevelStats);
+
+                if (tvLevelComplete != null && tvHighestLevel != null && tvLevelStats != null) {
+                    tvLevelComplete.setText(String.format("Level %d Complete!", currentLevel - 1));
+                    tvHighestLevel.setText(String.format("Highest Level: %d", highestLevel));
+
+                    // Show level stats
+                    int platforms = logic.getCurrentPlatformCount();
+                    float memoryTime = logic.getCurrentMemoryTimeSeconds();
+                    tvLevelStats.setText(String.format("Next: %d platforms, %.1fs memory",
+                            platforms, memoryTime));
                 }
             }
 

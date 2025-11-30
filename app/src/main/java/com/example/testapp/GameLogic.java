@@ -8,7 +8,6 @@ import java.util.Random;
 public class GameLogic {
 
     // Constants
-    private static final int TOTAL_PLATFORMS = 6;
     private static final float PLATFORM_Y = 1.0f;
     private static final float PLATFORM_Z_SPACING = 5f;
     private static final long INPUT_DELAY_MS = 150;
@@ -16,17 +15,31 @@ public class GameLogic {
     private static final float GLASS_BREAK_SHAKE = 0.25f;
     private static final float SHAKE_DECAY_RATE = 3.0f;
     private static final long RESPAWN_DELAY_MS = 400;
-    private static final long LAND_EFFECT_DELAY_MS = 250;
     private static final float MAX_DELTA_TIME = 0.05f;
 
-    // Memory game constants
-    private static final long MEMORY_DISPLAY_DURATION_MS = 3000; // 3 seconds to memorize
-    private static final long MEMORY_FADE_DURATION_MS = 500; // 0.5 seconds fade out
+    // Level system constants
+    private static final int MIN_PLATFORMS = 6;
+    private static final int MAX_PLATFORMS = 10;
+    private static final long BASE_MEMORY_TIME_MS = 3500;
+    private static final long MIN_MEMORY_TIME_MS = 1000;
+    private static final long MEMORY_TIME_DECREASE_PER_LEVEL_MS = 150;
+    private static final long MEMORY_FADE_DURATION_MS = 500;
 
     private boolean hasStartedTimer = false;
 
     public enum GameState {
-        MENU, MEMORY_PHASE, PLAYING, PAUSED, WON
+        MENU, MEMORY_PHASE, PLAYING, PAUSED, WON, LEVEL_TRANSITION
+    }
+
+    // Level configuration
+    private static class LevelConfig {
+        int totalPlatforms;
+        long memoryDisplayDuration;
+
+        LevelConfig(int platforms, long memoryTime) {
+            this.totalPlatforms = platforms;
+            this.memoryDisplayDuration = memoryTime;
+        }
     }
 
     public PlatformGlass[] platforms;
@@ -39,8 +52,11 @@ public class GameLogic {
     private long gameStartTime = 0;
     private long pauseStartTime = 0;
     private long totalPausedTime = 0;
-    private long winTime = 0;
-    private double bestTime = Double.MAX_VALUE;
+
+    // Level system
+    private int currentLevel = 1;
+    private int highestLevelReached = 1;
+    private LevelConfig currentConfig;
 
     // Memory phase tracking
     private long memoryPhaseStartTime = 0;
@@ -65,13 +81,30 @@ public class GameLogic {
     private final ArrayList<ScheduledEvent> scheduledEvents = new ArrayList<>();
 
     public GameLogic() {
+        currentConfig = getLevelConfig(currentLevel);
         initializeGame();
     }
 
+    private LevelConfig getLevelConfig(int level) {
+        // Calculate platforms: starts at 6, adds 1 per level, caps at 10
+        int platforms = Math.min(MIN_PLATFORMS + (level - 1), MAX_PLATFORMS);
+
+        // Calculate memory time: starts at 3.5s, decreases by 150ms per level, minimum 1s
+        long memoryTime = Math.max(
+                MIN_MEMORY_TIME_MS,
+                BASE_MEMORY_TIME_MS - ((level - 1) * MEMORY_TIME_DECREASE_PER_LEVEL_MS)
+        );
+
+        return new LevelConfig(platforms, memoryTime);
+    }
+
     private void initializeGame() {
-        if (platforms == null) {
-            platforms = new PlatformGlass[TOTAL_PLATFORMS];
+        currentConfig = getLevelConfig(currentLevel);
+
+        if (platforms == null || platforms.length != currentConfig.totalPlatforms) {
+            platforms = new PlatformGlass[currentConfig.totalPlatforms];
         }
+
         float startZ = 0f;
 
         // First platform - starting platform (black, centered, full width)
@@ -79,14 +112,19 @@ public class GameLogic {
         platforms[0].setIsStart(true);
 
         // Middle platforms - regular glass bridge sections
-        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+        for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
             boolean leftIsCorrect = random.nextBoolean();
             platforms[i] = new PlatformGlass(i, leftIsCorrect, PLATFORM_Y, startZ + i * PLATFORM_Z_SPACING);
         }
 
         // Last platform - finish platform (black, centered, full width)
-        platforms[TOTAL_PLATFORMS - 1] = new PlatformGlass(TOTAL_PLATFORMS - 1, true, PLATFORM_Y, startZ + (TOTAL_PLATFORMS - 1) * PLATFORM_Z_SPACING);
-        platforms[TOTAL_PLATFORMS - 1].setIsFinish(true);
+        platforms[currentConfig.totalPlatforms - 1] = new PlatformGlass(
+                currentConfig.totalPlatforms - 1,
+                true,
+                PLATFORM_Y,
+                startZ + (currentConfig.totalPlatforms - 1) * PLATFORM_Z_SPACING
+        );
+        platforms[currentConfig.totalPlatforms - 1].setIsFinish(true);
 
         if (player == null) {
             player = new Player(0f, PLATFORM_Y, startZ);
@@ -106,33 +144,32 @@ public class GameLogic {
     }
 
     public void startGame() {
+        currentLevel = 1;
         initializeGame();
         state = GameState.MEMORY_PHASE;
         memoryPhaseStartTime = SystemClock.uptimeMillis();
         totalPausedTime = 0;
-        winTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
 
         // Show hints on all platforms
-        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+        for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
             platforms[i].showMemoryHint(true);
         }
     }
 
-    public void restartGame() {
+    public void restartCurrentLevel() {
         initializeGame();
         state = GameState.MEMORY_PHASE;
         memoryPhaseStartTime = SystemClock.uptimeMillis();
-        gameStartTime = 0; // Will be set when memory phase ends
+        gameStartTime = 0;
         totalPausedTime = 0;
-        winTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
         hasStartedTimer = false;
 
         // Show hints on all platforms
-        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+        for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
             platforms[i].showMemoryHint(true);
         }
     }
@@ -152,10 +189,10 @@ public class GameLogic {
     }
 
     public void returnToMenu() {
+        currentLevel = 1;
         state = GameState.MENU;
         initializeGame();
         totalPausedTime = 0;
-        winTime = 0;
     }
 
     private void scheduleOnGLThread(Runnable action, long delayMs) {
@@ -174,7 +211,7 @@ public class GameLogic {
     }
 
     private void handleJump(boolean left) {
-        if (!isActive || platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
+        if (!isActive || platforms == null || player == null || nextPlatform >= currentConfig.totalPlatforms) {
             return;
         }
 
@@ -209,13 +246,13 @@ public class GameLogic {
             // Correct platform - just land with shake
             shakeAmount = JUMP_LAND_SHAKE;
 
-            if (nextPlatform >= TOTAL_PLATFORMS) {
-                scheduleOnGLThread(this::winGame, 0);
+            if (nextPlatform >= currentConfig.totalPlatforms) {
+                scheduleOnGLThread(this::winLevel, 0);
             }
         } else {
             // Wrong platform - wait for player to land, then break it
             scheduleOnGLThread(() -> {
-                if (isActive && player != null && state == GameState.PLAYING) {
+                if (isActive && player != null && platforms != null && state == GameState.PLAYING) {
                     // Break the platform
                     p.breakSide(left);
                     shakeAmount = GLASS_BREAK_SHAKE;
@@ -224,13 +261,10 @@ public class GameLogic {
                     player.fall();
                     isRespawning = true;
 
-                    // Schedule respawn after falling
+                    // Schedule level decrease after falling
                     scheduleOnGLThread(() -> {
-                        if (isActive && player != null && state == GameState.PLAYING) {
-                            player.respawn();
-                            nextPlatform = 1; // Reset to first glass platform
-                            isRespawning = false;
-                            lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+                        if (isActive) {
+                            failLevel();
                         }
                     }, RESPAWN_DELAY_MS);
                 }
@@ -238,14 +272,47 @@ public class GameLogic {
         }
     }
 
-    private void winGame() {
+    private void winLevel() {
         if (state != GameState.PLAYING) return;
 
+        // Advance to next level
+        currentLevel++;
+        if (currentLevel > highestLevelReached) {
+            highestLevelReached = currentLevel;
+        }
+
         state = GameState.WON;
-        winTime = SystemClock.uptimeMillis();
-        double elapsed = getElapsedSeconds();
-        if (elapsed < bestTime) {
-            bestTime = elapsed;
+    }
+
+    private void failLevel() {
+        if (!isActive) return;
+
+        // Go back one level (minimum level 1)
+        currentLevel = Math.max(1, currentLevel - 1);
+
+        // Reset game state
+        state = GameState.PLAYING;
+        isRespawning = false;
+
+        // Reinitialize the game with new level
+        initializeGame();
+
+        // Start memory phase for the new level
+        state = GameState.MEMORY_PHASE;
+        memoryPhaseStartTime = SystemClock.uptimeMillis();
+        gameStartTime = 0;
+        totalPausedTime = 0;
+        lastFrameTime = SystemClock.uptimeMillis();
+        lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+        hasStartedTimer = false;
+
+        // Show hints on all platforms
+        if (platforms != null) {
+            for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
+                if (platforms[i] != null) {
+                    platforms[i].showMemoryHint(true);
+                }
+            }
         }
     }
 
@@ -261,20 +328,21 @@ public class GameLogic {
         // Handle memory phase
         if (state == GameState.MEMORY_PHASE) {
             long elapsed = currentTime - memoryPhaseStartTime;
+            long totalMemoryDuration = currentConfig.memoryDisplayDuration + MEMORY_FADE_DURATION_MS;
 
-            if (elapsed >= MEMORY_DISPLAY_DURATION_MS + MEMORY_FADE_DURATION_MS) {
+            if (elapsed >= totalMemoryDuration) {
                 // Memory phase complete - transition to playing
                 state = GameState.PLAYING;
                 memoryPhaseComplete = true;
 
                 // Hide all hints
-                for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+                for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
                     platforms[i].showMemoryHint(false);
                 }
-            } else if (elapsed >= MEMORY_DISPLAY_DURATION_MS) {
+            } else if (elapsed >= currentConfig.memoryDisplayDuration) {
                 // Fade out phase
-                float fadeProgress = (elapsed - MEMORY_DISPLAY_DURATION_MS) / (float) MEMORY_FADE_DURATION_MS;
-                for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+                float fadeProgress = (elapsed - currentConfig.memoryDisplayDuration) / (float) MEMORY_FADE_DURATION_MS;
+                for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
                     platforms[i].setMemoryHintAlpha(1.0f - fadeProgress);
                 }
             }
@@ -282,21 +350,32 @@ public class GameLogic {
 
         if (state == GameState.PLAYING) {
             // Execute scheduled events
+            ArrayList<ScheduledEvent> toExecute = new ArrayList<>();
             synchronized (scheduledEvents) {
                 for (int i = scheduledEvents.size() - 1; i >= 0; i--) {
                     ScheduledEvent ev = scheduledEvents.get(i);
                     if (ev.executeAt <= currentTime) {
-                        try {
-                            ev.action.run();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                        }
-                        scheduledEvents.remove(i);
+                        toExecute.add(ev);
                     }
+                }
+                // Remove executed events
+                for (ScheduledEvent ev : toExecute) {
+                    scheduledEvents.remove(ev);
                 }
             }
 
-            player.update();
+            // Execute outside the synchronized block to avoid deadlocks
+            for (ScheduledEvent ev : toExecute) {
+                try {
+                    ev.action.run();
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                }
+            }
+
+            if (player != null) {
+                player.update();
+            }
         }
 
         for (PlatformGlass p : platforms) {
@@ -327,32 +406,17 @@ public class GameLogic {
         return Math.max(0, shakeAmount);
     }
 
-    public double getElapsedSeconds() {
-        if (!hasStartedTimer) return 0;
-        if (state == GameState.MENU || state == GameState.MEMORY_PHASE) {
-            return 0;
-        }
-        if (state == GameState.WON) {
-            if (winTime == 0) return 0;
-            return (winTime - gameStartTime - totalPausedTime) / 1000.0;
-        }
-        if (state == GameState.PAUSED) {
-            if (pauseStartTime == 0) return 0;
-            return (pauseStartTime - gameStartTime - totalPausedTime) / 1000.0;
-        }
-        return (SystemClock.uptimeMillis() - gameStartTime - totalPausedTime) / 1000.0;
-    }
-
     public float getMemoryPhaseProgress() {
         if (state != GameState.MEMORY_PHASE) return 1.0f;
         long elapsed = SystemClock.uptimeMillis() - memoryPhaseStartTime;
-        return Math.min(1.0f, elapsed / (float) (MEMORY_DISPLAY_DURATION_MS + MEMORY_FADE_DURATION_MS));
+        long totalDuration = currentConfig.memoryDisplayDuration + MEMORY_FADE_DURATION_MS;
+        return Math.min(1.0f, elapsed / (float) totalDuration);
     }
 
     public long getMemoryPhaseRemainingMs() {
         if (state != GameState.MEMORY_PHASE) return 0;
         long elapsed = SystemClock.uptimeMillis() - memoryPhaseStartTime;
-        long remaining = MEMORY_DISPLAY_DURATION_MS - elapsed;
+        long remaining = currentConfig.memoryDisplayDuration - elapsed;
         return Math.max(0, remaining);
     }
 
@@ -360,7 +424,11 @@ public class GameLogic {
     public boolean isPlaying() { return state == GameState.PLAYING; }
     public boolean isInMemoryPhase() { return state == GameState.MEMORY_PHASE; }
     public boolean isGameWon() { return state == GameState.WON; }
-    public double getBestTime() { return bestTime == Double.MAX_VALUE ? 0 : bestTime; }
+
+    public int getCurrentLevel() { return currentLevel; }
+    public int getHighestLevelReached() { return highestLevelReached; }
+    public int getCurrentPlatformCount() { return currentConfig.totalPlatforms; }
+    public float getCurrentMemoryTimeSeconds() { return currentConfig.memoryDisplayDuration / 1000f; }
 
     public void cleanup() {
         isActive = false;

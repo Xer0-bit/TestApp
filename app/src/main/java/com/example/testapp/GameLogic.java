@@ -92,20 +92,23 @@ public class GameLogic {
         int platforms;
         long memoryTime;
 
-        // Platform calculation
-        if (level <= 50) {
-            // Levels 1-50: Stay at 5 platforms
-            platforms = PLATFORMS_AT_LEVEL_1_50;
+        // How many PLAYABLE platforms you want
+        int playable;
+
+        if (level < 20) {
+            playable = 3;
+        } else if (level < 40) {
+            playable = 4;
         } else {
-            // Levels 51+: Add 1 platform every 10 levels
-            // Level 51-60: 6 platforms
-            // Level 61-70: 7 platforms
-            // Level 71-80: 8 platforms
-            // Level 81-90: 9 platforms
-            // Level 91+: 10 platforms (max)
-            int additionalPlatforms = (level - 50) / LEVELS_PER_PLATFORM_INCREASE;
-            platforms = Math.min(PLATFORMS_AT_LEVEL_1_50 + additionalPlatforms, MAX_PLATFORMS);
+            // Level 40 gives 5 playable, +1 every 20 levels
+            playable = 5 + ((level - 40) / 20);
         }
+
+        // Convert playable count → total platform count
+        platforms = playable + 2;
+
+        // Safety clamp
+        platforms = Math.min(platforms, MAX_PLATFORMS);
 
         // Memory time calculation - aggressive early game, scales with platforms later
         if (level <= 50) {

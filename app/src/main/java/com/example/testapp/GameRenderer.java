@@ -157,12 +157,34 @@ public class GameRenderer implements GLSurfaceView.Renderer {
             }
         }
 
-        // Create floating magical books
+        // Create floating magical books - CONSTRAINED TO SIDES AND BEHIND FINISH
         floatingBooks = new MagicalBook[FLOATING_BOOK_COUNT];
+
+        // Calculate the finish platform Z position (last platform)
+        float finishZ = (BOOKSHELF_COUNT - 1) * 5f; // Based on PLATFORM_Z_SPACING from GameLogic
+
         for (int i = 0; i < FLOATING_BOOK_COUNT; i++) {
-            float x = (rand.nextFloat() - 0.5f) * 12f;
+            float x, z;
+
+            // Randomly decide: sides (80% chance) or behind finish (20% chance)
+            if (rand.nextFloat() < 0.8f) {
+                // SIDES: Keep books outside the play area (beyond ±3f)
+                if (rand.nextBoolean()) {
+                    // Left side
+                    x = -4f - rand.nextFloat() * 4f; // Between -4 and -8
+                } else {
+                    // Right side
+                    x = 4f + rand.nextFloat() * 4f; // Between 4 and 8
+                }
+                // Z can be anywhere along the path
+                z = rand.nextFloat() * finishZ - 5f;
+            } else {
+                // BEHIND FINISH: Books past the finish line
+                x = (rand.nextFloat() - 0.5f) * 10f; // Can be anywhere horizontally
+                z = finishZ + 5f + rand.nextFloat() * 15f; // Beyond finish platform
+            }
+
             float y = rand.nextFloat() * 6f + 2f;
-            float z = rand.nextFloat() * 30f - 5f;
             floatingBooks[i] = new MagicalBook(x, y, z, rand);
         }
 

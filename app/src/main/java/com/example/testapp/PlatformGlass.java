@@ -25,6 +25,10 @@ public class PlatformGlass {
     private float xLeft = X_LEFT;
     private float xRight = X_RIGHT;
 
+    // Memory hint visualization
+    private boolean showingMemoryHint = false;
+    private float memoryHintAlpha = 1.0f;
+
     public PlatformGlass(int idx, boolean correctLeft, float y, float z) {
         this.index = idx;
         this.leftIsCorrect = correctLeft;
@@ -74,6 +78,17 @@ public class PlatformGlass {
         } else {
             rightBroken = true;
         }
+    }
+
+    public void showMemoryHint(boolean show) {
+        this.showingMemoryHint = show;
+        if (show) {
+            this.memoryHintAlpha = 1.0f;
+        }
+    }
+
+    public void setMemoryHintAlpha(float alpha) {
+        this.memoryHintAlpha = Math.max(0f, Math.min(1f, alpha));
     }
 
     public void update() {
@@ -141,6 +156,11 @@ public class PlatformGlass {
                 border.size = PLATFORM_SIZE * 1.1f;
                 border.modelRotationX = 0;
                 border.drawWithRotation(vpMatrix, edgeGlow);
+
+                // Memory hint outline
+                if (showingMemoryHint && memoryHintAlpha > 0) {
+                    drawMemoryHintOutline(vpMatrix, xLeft, y, z, leftIsCorrect, memoryHintAlpha);
+                }
             }
         }
 
@@ -161,7 +181,42 @@ public class PlatformGlass {
                 border.size = PLATFORM_SIZE * 1.1f;
                 border.modelRotationX = 0;
                 border.drawWithRotation(vpMatrix, edgeGlow);
+
+                // Memory hint outline
+                if (showingMemoryHint && memoryHintAlpha > 0) {
+                    drawMemoryHintOutline(vpMatrix, xRight, y, z, !leftIsCorrect, memoryHintAlpha);
+                }
             }
+        }
+    }
+
+    private void drawMemoryHintOutline(float[] vpMatrix, float x, float y, float z,
+                                       boolean isSafe, float alpha) {
+        float time = android.os.SystemClock.uptimeMillis() / 1000f;
+        float pulse = (float) Math.sin(time * 4f) * 0.15f + 0.85f;
+
+        float[] safeColor = {0.2f, 0.6f, 1.0f, 0.7f * alpha * pulse};    // Blue for safe
+        float[] unsafeColor = {0.7f, 0.2f, 0.9f, 0.7f * alpha * pulse};  // Purple for unsafe
+
+        float[] outlineColor = isSafe ? safeColor : unsafeColor;
+
+        // Draw multiple outline layers for glow effect
+        for (int i = 0; i < 3; i++) {
+            float offsetY = 0.15f + i * 0.1f;
+            float scale = 1.3f + i * 0.15f;
+            float layerAlpha = outlineColor[3] * (1.0f - i * 0.3f);
+
+            float[] layerColor = {
+                    outlineColor[0],
+                    outlineColor[1],
+                    outlineColor[2],
+                    layerAlpha
+            };
+
+            Cube outline = new Cube(x, y + offsetY, z);
+            outline.size = PLATFORM_SIZE * scale;
+            outline.modelRotationX = 0;
+            outline.drawWithRotation(vpMatrix, layerColor);
         }
     }
 

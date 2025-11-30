@@ -15,6 +15,7 @@ public class MainActivity extends AppCompatActivity {
     private GameSurfaceView gameView;
     private Handler uiHandler = new Handler();
     private TextView tvTimer;
+    private TextView tvMemoryPhase;
     private Runnable tickRunnable;
 
     private LinearLayout mainMenu, pauseMenu, winMenu;
@@ -31,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
 
         gameView = findViewById(R.id.gameView);
         tvTimer = findViewById(R.id.tvTimer);
+        tvMemoryPhase = findViewById(R.id.tvMemoryPhase);
 
         mainMenu = findViewById(R.id.mainMenu);
         pauseMenu = findViewById(R.id.pauseMenu);
@@ -96,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 if (!isActivityDestroyed) {
-                    updateTimerUI();
+                    updateUI();
                     uiHandler.postDelayed(this, 100);
                 }
             }
@@ -104,17 +106,36 @@ public class MainActivity extends AppCompatActivity {
         uiHandler.post(tickRunnable);
     }
 
-    private void updateTimerUI() {
+    private void updateUI() {
         if (logic == null || isActivityDestroyed) return;
 
         try {
-            double elapsed = logic.getElapsedSeconds();
-            tvTimer.setText(String.format("Time: %.2fs", elapsed));
+            // Handle memory phase display
+            if (logic.isInMemoryPhase()) {
+                tvTimer.setVisibility(View.GONE);
+                tvMemoryPhase.setVisibility(View.VISIBLE);
+
+                long remainingMs = logic.getMemoryPhaseRemainingMs();
+                double remainingSec = remainingMs / 1000.0;
+
+                if (remainingMs > 0) {
+                    tvMemoryPhase.setText(String.format("Memorize the path!\n%.1fs", remainingSec));
+                } else {
+                    tvMemoryPhase.setText("Get ready...");
+                }
+            } else {
+                tvMemoryPhase.setVisibility(View.GONE);
+                tvTimer.setVisibility(View.VISIBLE);
+
+                double elapsed = logic.getElapsedSeconds();
+                tvTimer.setText(String.format("Time: %.2fs", elapsed));
+            }
 
             // Show win menu only once
             if (logic.isGameWon() && !winMenuShown) {
                 winMenuShown = true;
                 winMenu.setVisibility(View.VISIBLE);
+                double elapsed = logic.getElapsedSeconds();
                 double bestTime = logic.getBestTime();
                 TextView tvWinTime = findViewById(R.id.tvWinTime);
                 TextView tvBestTimeWin = findViewById(R.id.tvBestTimeWin);

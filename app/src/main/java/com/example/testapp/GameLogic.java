@@ -18,10 +18,15 @@ public class GameLogic {
     private static final long RESPAWN_DELAY_MS = 400;
     private static final long LAND_EFFECT_DELAY_MS = 250;
     private static final float MAX_DELTA_TIME = 0.05f;
+
+    // Memory game constants
+    private static final long MEMORY_DISPLAY_DURATION_MS = 3000; // 3 seconds to memorize
+    private static final long MEMORY_FADE_DURATION_MS = 500; // 0.5 seconds fade out
+
     private boolean hasStartedTimer = false;
 
     public enum GameState {
-        MENU, PLAYING, PAUSED, WON
+        MENU, MEMORY_PHASE, PLAYING, PAUSED, WON
     }
 
     public PlatformGlass[] platforms;
@@ -36,6 +41,10 @@ public class GameLogic {
     private long totalPausedTime = 0;
     private long winTime = 0;
     private double bestTime = Double.MAX_VALUE;
+
+    // Memory phase tracking
+    private long memoryPhaseStartTime = 0;
+    private boolean memoryPhaseComplete = false;
 
     private float shakeAmount = 0f;
     private long lastJumpTime = 0;
@@ -91,28 +100,41 @@ public class GameLogic {
         lastFrameTime = SystemClock.uptimeMillis();
         isRespawning = false;
         hasStartedTimer = false;
+        memoryPhaseComplete = false;
 
         scheduledEvents.clear();
     }
 
     public void startGame() {
         initializeGame();
-        state = GameState.PLAYING;
+        state = GameState.MEMORY_PHASE;
+        memoryPhaseStartTime = SystemClock.uptimeMillis();
         totalPausedTime = 0;
         winTime = 0;
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
+
+        // Show hints on all platforms
+        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+            platforms[i].showMemoryHint(true);
+        }
     }
 
     public void restartGame() {
         initializeGame();
-        gameStartTime = SystemClock.uptimeMillis();
+        state = GameState.MEMORY_PHASE;
+        memoryPhaseStartTime = SystemClock.uptimeMillis();
+        gameStartTime = 0; // Will be set when memory phase ends
         totalPausedTime = 0;
         winTime = 0;
-        state = GameState.PLAYING;
         lastFrameTime = SystemClock.uptimeMillis();
         lastJumpTime = SystemClock.uptimeMillis() - INPUT_DELAY_MS;
-        hasStartedTimer = true;
+        hasStartedTimer = false;
+
+        // Show hints on all platforms
+        for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+            platforms[i].showMemoryHint(true);
+        }
     }
 
     public void pauseGame() {
@@ -153,6 +175,11 @@ public class GameLogic {
 
     private void handleJump(boolean left) {
         if (!isActive || platforms == null || player == null || nextPlatform >= TOTAL_PLATFORMS) {
+            return;
+        }
+
+        // Can't jump during memory phase
+        if (state == GameState.MEMORY_PHASE) {
             return;
         }
 
@@ -223,7 +250,7 @@ public class GameLogic {
     }
 
     public void update() {
-        if (state != GameState.PLAYING || !isActive) return;
+        if (!isActive) return;
         if (player == null || platforms == null) return;
 
         long currentTime = SystemClock.uptimeMillis();
@@ -231,22 +258,46 @@ public class GameLogic {
         lastFrameTime = currentTime;
         deltaTime = Math.min(deltaTime, MAX_DELTA_TIME);
 
-        // Execute scheduled events
-        synchronized (scheduledEvents) {
-            for (int i = scheduledEvents.size() - 1; i >= 0; i--) {
-                ScheduledEvent ev = scheduledEvents.get(i);
-                if (ev.executeAt <= currentTime) {
-                    try {
-                        ev.action.run();
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                    }
-                    scheduledEvents.remove(i);
+        // Handle memory phase
+        if (state == GameState.MEMORY_PHASE) {
+            long elapsed = currentTime - memoryPhaseStartTime;
+
+            if (elapsed >= MEMORY_DISPLAY_DURATION_MS + MEMORY_FADE_DURATION_MS) {
+                // Memory phase complete - transition to playing
+                state = GameState.PLAYING;
+                memoryPhaseComplete = true;
+
+                // Hide all hints
+                for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+                    platforms[i].showMemoryHint(false);
+                }
+            } else if (elapsed >= MEMORY_DISPLAY_DURATION_MS) {
+                // Fade out phase
+                float fadeProgress = (elapsed - MEMORY_DISPLAY_DURATION_MS) / (float) MEMORY_FADE_DURATION_MS;
+                for (int i = 1; i < TOTAL_PLATFORMS - 1; i++) {
+                    platforms[i].setMemoryHintAlpha(1.0f - fadeProgress);
                 }
             }
         }
 
-        player.update();
+        if (state == GameState.PLAYING) {
+            // Execute scheduled events
+            synchronized (scheduledEvents) {
+                for (int i = scheduledEvents.size() - 1; i >= 0; i--) {
+                    ScheduledEvent ev = scheduledEvents.get(i);
+                    if (ev.executeAt <= currentTime) {
+                        try {
+                            ev.action.run();
+                        } catch (Throwable t) {
+                            t.printStackTrace();
+                        }
+                        scheduledEvents.remove(i);
+                    }
+                }
+            }
+
+            player.update();
+        }
 
         for (PlatformGlass p : platforms) {
             if (p != null) {
@@ -278,7 +329,7 @@ public class GameLogic {
 
     public double getElapsedSeconds() {
         if (!hasStartedTimer) return 0;
-        if (state == GameState.MENU) {
+        if (state == GameState.MENU || state == GameState.MEMORY_PHASE) {
             return 0;
         }
         if (state == GameState.WON) {
@@ -292,8 +343,22 @@ public class GameLogic {
         return (SystemClock.uptimeMillis() - gameStartTime - totalPausedTime) / 1000.0;
     }
 
+    public float getMemoryPhaseProgress() {
+        if (state != GameState.MEMORY_PHASE) return 1.0f;
+        long elapsed = SystemClock.uptimeMillis() - memoryPhaseStartTime;
+        return Math.min(1.0f, elapsed / (float) (MEMORY_DISPLAY_DURATION_MS + MEMORY_FADE_DURATION_MS));
+    }
+
+    public long getMemoryPhaseRemainingMs() {
+        if (state != GameState.MEMORY_PHASE) return 0;
+        long elapsed = SystemClock.uptimeMillis() - memoryPhaseStartTime;
+        long remaining = MEMORY_DISPLAY_DURATION_MS - elapsed;
+        return Math.max(0, remaining);
+    }
+
     public GameState getGameState() { return state; }
     public boolean isPlaying() { return state == GameState.PLAYING; }
+    public boolean isInMemoryPhase() { return state == GameState.MEMORY_PHASE; }
     public boolean isGameWon() { return state == GameState.WON; }
     public double getBestTime() { return bestTime == Double.MAX_VALUE ? 0 : bestTime; }
 

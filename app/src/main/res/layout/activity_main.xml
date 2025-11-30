@@ -15,7 +15,25 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- TIMER TEXT -->
+    <!-- MEMORY PHASE TEXT (shown during memorization) -->
+    <TextView
+        android:id="@+id/tvMemoryPhase"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Memorize the path!"
+        android:textColor="@android:color/white"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:background="#AA000000"
+        android:padding="20dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- TIMER TEXT (shown during gameplay) -->
     <TextView
         android:id="@+id/tvTimer"
         android:layout_width="wrap_content"
@@ -55,6 +73,15 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Glass Bridge Memory"
+            android:textColor="@android:color/white"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="32dp" />
 
         <Button
             android:id="@+id/btnStartGame"

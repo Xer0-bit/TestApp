@@ -18,12 +18,15 @@ public class GameLogic {
     private static final float MAX_DELTA_TIME = 0.05f;
 
     // Level system constants
-    private static final int MIN_PLATFORMS = 6;
+    private static final int STARTING_PLATFORMS = 3;
     private static final int MAX_PLATFORMS = 10;
-    private static final long BASE_MEMORY_TIME_MS = 3500;
-    private static final long MIN_MEMORY_TIME_MS = 1000;
-    private static final long MEMORY_TIME_DECREASE_PER_LEVEL_MS = 150;
+    private static final long BASE_MEMORY_TIME_MS = 3000;
+    private static final long MIN_MEMORY_TIME_MS = 500;
     private static final long MEMORY_FADE_DURATION_MS = 500;
+
+    // Platform tiers - adds platform every 10 levels after level 50
+    private static final int PLATFORMS_AT_LEVEL_1_50 = 5;
+    private static final int LEVELS_PER_PLATFORM_INCREASE = 10;
 
     private boolean hasStartedTimer = false;
 
@@ -86,14 +89,53 @@ public class GameLogic {
     }
 
     private LevelConfig getLevelConfig(int level) {
-        // Calculate platforms: starts at 6, adds 1 per level, caps at 10
-        int platforms = Math.min(MIN_PLATFORMS + (level - 1), MAX_PLATFORMS);
+        int platforms;
+        long memoryTime;
 
-        // Calculate memory time: starts at 3.5s, decreases by 150ms per level, minimum 1s
-        long memoryTime = Math.max(
-                MIN_MEMORY_TIME_MS,
-                BASE_MEMORY_TIME_MS - ((level - 1) * MEMORY_TIME_DECREASE_PER_LEVEL_MS)
-        );
+        // Platform calculation
+        if (level <= 50) {
+            // Levels 1-50: Stay at 5 platforms
+            platforms = PLATFORMS_AT_LEVEL_1_50;
+        } else {
+            // Levels 51+: Add 1 platform every 10 levels
+            // Level 51-60: 6 platforms
+            // Level 61-70: 7 platforms
+            // Level 71-80: 8 platforms
+            // Level 81-90: 9 platforms
+            // Level 91+: 10 platforms (max)
+            int additionalPlatforms = (level - 50) / LEVELS_PER_PLATFORM_INCREASE;
+            platforms = Math.min(PLATFORMS_AT_LEVEL_1_50 + additionalPlatforms, MAX_PLATFORMS);
+        }
+
+        // Memory time calculation - aggressive early game, scales with platforms later
+        if (level <= 50) {
+            // Levels 1-50: Aggressive decrease - 80ms per level
+            // This creates immediate challenge and keeps early game engaging
+            long baseDecrease = (level - 1) * 80L;
+            memoryTime = BASE_MEMORY_TIME_MS - baseDecrease;
+        } else {
+            // Levels 51+: Slower decrease - 40ms per level
+            // Starts from where level 50 left off
+            long level50Time = BASE_MEMORY_TIME_MS - (49 * 80L);
+            long additionalDecrease = (level - 50) * 40L;
+            memoryTime = level50Time - additionalDecrease;
+        }
+
+        // When a new platform is added, give bonus time to compensate
+        // Check if we just crossed a platform threshold
+        if (level > 50) {
+            int currentPlatformTier = (level - 50) / LEVELS_PER_PLATFORM_INCREASE;
+            int previousLevel = level - 1;
+            int previousPlatformTier = previousLevel > 50 ? (previousLevel - 50) / LEVELS_PER_PLATFORM_INCREASE : 0;
+
+            // If we just gained a new platform, add 1000ms bonus time
+            if (currentPlatformTier > previousPlatformTier) {
+                memoryTime += 1000L;
+            }
+        }
+
+        // Clamp to minimum
+        memoryTime = Math.max(MIN_MEMORY_TIME_MS, memoryTime);
 
         return new LevelConfig(platforms, memoryTime);
     }
@@ -111,10 +153,45 @@ public class GameLogic {
         platforms[0] = new PlatformGlass(0, true, PLATFORM_Y, startZ);
         platforms[0].setIsStart(true);
 
-        // Middle platforms - regular glass bridge sections
+        // Middle platforms - regular glass bridge sections with weighted randomization
+        // This prevents long streaks of same side being correct
+        int consecutiveCount = 0;
+        boolean lastLeftIsCorrect = random.nextBoolean(); // First platform is pure random
+
         for (int i = 1; i < currentConfig.totalPlatforms - 1; i++) {
-            boolean leftIsCorrect = random.nextBoolean();
+            boolean leftIsCorrect;
+
+            if (i == 1) {
+                // First glass platform is pure random
+                leftIsCorrect = lastLeftIsCorrect;
+            } else {
+                // Calculate probability based on consecutive count
+                // Much more aggressive penalty to prevent long streaks
+                float baseProbability = 0.5f;
+                float penaltyPerConsecutive = 0.25f; // Increased from 0.15f
+                float probability = baseProbability - (consecutiveCount * penaltyPerConsecutive);
+
+                // Hard cap at 4 consecutive - force switch after 4
+                if (consecutiveCount >= 4) {
+                    leftIsCorrect = !lastLeftIsCorrect; // Force switch
+                    consecutiveCount = 0;
+                } else {
+                    // Clamp between 5% and 95% to keep some randomness
+                    probability = Math.max(0.05f, Math.min(0.95f, probability));
+
+                    // Decide if we should keep the same side correct
+                    if (random.nextFloat() < probability) {
+                        leftIsCorrect = lastLeftIsCorrect; // Same as last
+                        consecutiveCount++;
+                    } else {
+                        leftIsCorrect = !lastLeftIsCorrect; // Switch sides
+                        consecutiveCount = 0; // Reset counter
+                    }
+                }
+            }
+
             platforms[i] = new PlatformGlass(i, leftIsCorrect, PLATFORM_Y, startZ + i * PLATFORM_Z_SPACING);
+            lastLeftIsCorrect = leftIsCorrect;
         }
 
         // Last platform - finish platform (black, centered, full width)
